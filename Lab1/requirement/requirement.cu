@@ -1,3 +1,6 @@
+// nvcc -o requirement.out requirement.cu   
+// requirement.out 3 2 1 2 3 4 5 6 
+
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -32,9 +35,7 @@ char * concat_col( char** const col,const int nrows){
     return new_str;
 }
 
-
 // Summation of String concatincation of the matrix cols
-
 int main(int argc, char* argv[]){
 
     // Redaing Matrix Dimensions
