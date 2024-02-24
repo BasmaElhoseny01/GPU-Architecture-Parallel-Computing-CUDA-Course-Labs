@@ -1,5 +1,5 @@
-// nvcc -o requirement.out requirement.cu   
-// requirement.out 3 2 1 2 3 4 5 6 
+// nvcc -o requirement requirement.cu   
+// requirement 3 2 1 2 3 4 5 6 
 
 #include <stdio.h>
 #include <stdlib.h>

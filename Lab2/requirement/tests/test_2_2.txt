@@ -1,0 +1,6 @@
+1
+2 2	          // no. of rows, columns respectively (tescase2)
+1.2 4.5		  // first 2 rows are for matrix1, the last 2 ones are for matrix2
+2.3 7.8
+2.7 6.3
+2.9 6.4

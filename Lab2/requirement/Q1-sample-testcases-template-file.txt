@@ -1,0 +1,13 @@
+2 // no. of test cases
+3 4  //no. of rows, columns respectively (tescase1)
+1.1 2.4 3.5 4.6    // first 3 rows are for matrix1, the last 3 ones are for matrix2
+5.9 6.2 7.3 8.8
+9.7 4.8 3.1 2.3
+3.4 5.7 8.9 3.2
+2.4 4.5 6.3 3.9
+3.2 2.3 4.8 6.3
+2 2	          // no. of rows, columns respectively (tescase2)
+1.2 4.5		  // first 2 rows are for matrix1, the last 2 ones are for matrix2
+2.3 7.8
+2.7 6.3
+2.9 6.4
