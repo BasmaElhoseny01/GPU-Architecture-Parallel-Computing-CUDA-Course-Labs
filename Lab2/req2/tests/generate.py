@@ -4,8 +4,14 @@ import random
 
 def generate_test_case(rows, columns):
     test_case = f"{rows} {columns}\n"
-    for _ in range(rows * 2):
+    # Generate Matrix
+    for _ in range(rows):
         row = " ".join(str(round(random.uniform(1, 10), 1)) for _ in range(columns))
+        test_case += f"{row}\n"
+
+    # Generate The vector
+    for _ in range(columns):
+        row = (str(round(random.uniform(1, 10), 1)))
         test_case += f"{row}\n"
     return test_case
 
@@ -17,7 +23,7 @@ def generate_test_file(num_test_cases, rows, columns,filename):
             file.write(test_case)
 
 def main():
-    parser = argparse.ArgumentParser(description="Generate a test file with random matrices.")
+    parser = argparse.ArgumentParser(description="Generate a test file [For Req 2 Vector x Matrix ]with random matrices.")
     parser.add_argument("num_test_cases", type=int, help="Number of test cases")
     parser.add_argument("rows", type=int, help="number of rows")
     parser.add_argument("columns", type=int, help="number of columns")

@@ -4,8 +4,11 @@
 #include <assert.h>
 #include <cuda.h>
 #include <cuda_runtime.h>
+#include <assert.h>
 
-#define MAX_ERR 1e-6
+#define MAX_ERR 1e-3
+
+
 
 __global__ void vector_add(float *out, float *matrix, float *vector, int N, int M)
 {
@@ -114,8 +117,30 @@ int main(int argc, char *argv[])
             printf("\nout[%d] = %f", i, out[i]);
         }
 
-        // print output to file, create if it doesn't exist and concatenate to it if it does
+        
+        // Verification :D
+        for(int i = 0; i < matrix_rows; i++){
+            // out[i]  result
+            // lOOP on rows for the output vector
+                float res=0;
+                for(int j = 0; j < matrix_columns; j++){
+                    res+=matrix[j+i*matrix_columns]*vector[j];
+                }
+                if (fabs(out[i] - res) >= MAX_ERR) {
+                    printf("Assertion failed: Maximum error exceeded!\n");
+                    printf("Computed value: %f\n", out[i]);
+                    printf("Reference value: %f\n", res);
+                    printf("Absolute error: %f\n", fabs(out[i] - res));
+                    printf("Check The Max Error: %f\n",MAX_ERR);
+                }
+                assert(fabs(out[i] -res) < MAX_ERR);
 
+        }
+
+        printf("\nPASSED\n");
+
+        // Write Result to the file
+        // print output to file, create if it doesn't exist and concatenate to it if it does
         FILE *output_file = fopen(output_path, "a");
         if (!output_file)
         {
