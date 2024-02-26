@@ -1,3 +1,8 @@
+// Run
+// nvcc -o out_1  ./k1.cu
+// out_1 ./testfile.txt ./out.txt
+// nvprof out_1 ./testfile.txt ./out.txt
+
 // Matrix Additon Level1 parallelism (1block, multiple threads)
 #include <stdio.h>
 #include <stdlib.h>
@@ -89,6 +94,7 @@ __global__ void add_matrix(float*a,float*b,float*c,const int rows,const int cols
 
 
 int main(int argc, char* argv[]){
+    printf("Kernel(1)\n");
 
     // Redaing txt files
     char* input_pth=argv[1];
