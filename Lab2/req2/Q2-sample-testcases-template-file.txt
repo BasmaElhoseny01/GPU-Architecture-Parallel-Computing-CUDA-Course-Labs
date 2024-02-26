@@ -1,0 +1,6 @@
+1           // no. of test cases
+2 2        // no. of rows, columns for the matrix respectively. (note that the vector length is the same as the matrix's no. of rows)
+2.3 6.2   // the first 2 lines are the rows of the matrix, the last 2 ones are the elements of the vector.
+2.6 5.4
+1.1
+2.4
