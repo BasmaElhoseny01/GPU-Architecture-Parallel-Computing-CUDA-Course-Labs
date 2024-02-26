@@ -107,7 +107,7 @@ int main(int argc, char *argv[])
         cudaMemcpy(d_out, out, sizeof(float) * matrix_rows, cudaMemcpyHostToDevice);
 
         // Executing kernel
-        vector_add<<<(matrix_columns + 255) / 256, 256>>>(d_out, d_matrix, d_vector, matrix_rows, matrix_columns);
+        vector_add<<<(matrix_rows + 255) / 256, 256>>>(d_out, d_matrix, d_vector, matrix_rows, matrix_columns);
 
         // Transfer data back to host memory
         cudaMemcpy(out, d_out, sizeof(float) * matrix_rows, cudaMemcpyDeviceToHost);
