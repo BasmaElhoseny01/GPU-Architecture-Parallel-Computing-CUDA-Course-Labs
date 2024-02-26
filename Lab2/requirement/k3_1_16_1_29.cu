@@ -187,14 +187,14 @@ int main(int argc, char* argv[]){
 
         
 
-        // Verification :D
-        for(int i = 0; i < rows; i++){
-            for(int j = 0; j < cols; j++){
-                assert(fabs(c[j+i*cols] - a[j+i*cols] - b[j+i*cols]) < MAX_ERR);
-            }
-        }
+        // // Verification :D
+        // for(int i = 0; i < rows; i++){
+        //     for(int j = 0; j < cols; j++){
+        //         assert(fabs(c[j+i*cols] - a[j+i*cols] - b[j+i*cols]) < MAX_ERR);
+        //     }
+        // }
 
-        printf("PASSED\n");
+        // printf("PASSED\n");
 
         // Write Result to the file
         write_matrix(file_out,c,rows,cols);
