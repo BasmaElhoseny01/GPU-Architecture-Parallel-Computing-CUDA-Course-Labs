@@ -5,19 +5,26 @@
 
 #define SIZE 256
 
-__global__ void sum_vec(float *arr, float *res)
+__global__ void sum_vec(float *arr, float *res, int N)
 {
     // Allocate shared memory
-    __shared__ int shared_sum[SIZE];
+    __shared__ float shared_sum[SIZE];
 
     // Calculate thread ID
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
 
-    // Load elements into shared memory
-    shared_sum[threadIdx.x] = arr[tid];
+    int amount_per_thread = ceil(float(N) / blockDim.x);
+
+    int start_index = tid * amount_per_thread;
+
+    int end_index = min(start_index + amount_per_thread, N);
+
+    for (int k = start_index; k < end_index; k++)
+    {
+        shared_sum[tid] += arr[k];
+    }
     __syncthreads();
 
-    // Iterate of log base 2 the block dimension
     for (int stride = 1; stride < blockDim.x; stride *= 2)
     {
         int index = stride * threadIdx.x << 1;
@@ -28,8 +35,6 @@ __global__ void sum_vec(float *arr, float *res)
         __syncthreads();
     }
 
-    // Let the thread 0 for this block write it's result to main memory
-    // Result is inexed by this block
     if (threadIdx.x == 0)
     {
         res[blockIdx.x] = shared_sum[0];
@@ -49,7 +54,8 @@ int main(int argc, char *argv[])
 
     for (int i = 0; i < N; i++)
     {
-        arr[i] = 1;
+        // arr[i] = atof(argv[i + 2]);
+        arr[i] = 1.0f;
     }
     // Allocate device memory
     float *d_arr, *d_res;
@@ -59,25 +65,20 @@ int main(int argc, char *argv[])
     // Copy to device
     cudaMemcpy(d_arr, arr, bytes, cudaMemcpyHostToDevice);
 
-    // TB Size
-    const int TB_SIZE = 256;
-
-    // Grid Size
-    int GRID_SIZE = ceil(float(N) / TB_SIZE);
-
-    // Print the grid size
-    printf("Grid Size: %d\n", GRID_SIZE);
     // Call kernels
-    sum_vec<<<GRID_SIZE, TB_SIZE>>>(d_arr, d_res);
-
-    sum_vec<<<1, TB_SIZE>>>(d_res, d_res);
+    sum_vec<<<1, SIZE>>>(d_arr, d_res, N);
 
     // Copy to host;
     cudaMemcpy(res, d_res, bytes, cudaMemcpyDeviceToHost);
 
     // print the result
+    printf("%f\n", res[0]);
 
-    printf("Sum: %f\n", res[0]);
+    cudaFree(d_arr);
+    cudaFree(d_res);
+
+    free(arr);
+    free(res);
 
     return 0;
 }
