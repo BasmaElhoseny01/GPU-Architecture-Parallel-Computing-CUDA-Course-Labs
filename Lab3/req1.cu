@@ -44,19 +44,51 @@ __global__ void sum_vec(float *arr, float *res, int N)
 int main(int argc, char *argv[])
 {
 
-    // Vector size
-    int N = atoi(argv[1]);
-    size_t bytes = N * sizeof(float);
+    char *input_file = argv[1];
+    float target_value = atof(argv[2]);
 
-    // Host data
+    int N = 0;
+
+    // Read the file
+    FILE *file = fopen(input_file, "r");
+    if (file == NULL)
+    {
+        printf("Error opening file!\n");
+        exit(1);
+    }
+
+    // Count the number of lines
+    char ch;
+    while (!feof(file))
+    {
+        ch = fgetc(file);
+        if (ch == '\n')
+        {
+            N++;
+        }
+    }
+    fclose(file);
+
+    // Allocate memory
+    size_t bytes = N * sizeof(float);
     float *arr = (float *)malloc(bytes);
-    float *res = (float *)malloc(bytes);
+
+    // Read the file
+    file = fopen(input_file, "r");
+    if (file == NULL)
+    {
+        printf("Error opening file!\n");
+        exit(1);
+    }
 
     for (int i = 0; i < N; i++)
     {
-        // arr[i] = atof(argv[i + 2]);
-        arr[i] = 1.0f;
+        fscanf(file, "%f", &arr[i]);
     }
+
+    // Host data
+    float *res = (float *)malloc(bytes);
+
     // Allocate device memory
     float *d_arr, *d_res;
     cudaMalloc(&d_arr, bytes);
