@@ -7,6 +7,7 @@
 #include <iostream>
 #include <fstream>
 #include <assert.h>
+#include <string.h>
 
 #define MAX_ERR 1e-6
 
@@ -101,101 +102,134 @@ void read_image(const char *filename, float **data, int *width, int *height, int
     stbi_image_free(udata);
     printf("Image loaded: width = %d, height = %d, comp = %d\n", *width, *height, *comp);
 }
-void writeImageToFile(const char *filename, const float *imageData, int width, int height)
+// void writeImageToFile(const char *filename, const float *imageData, int width, int height)
+// {
+//     std::ofstream file(filename, std::ios::out | std::ios::binary);
+//     if (!file)
+//     {
+//         std::cerr << "Error: Unable to open file for writing." << std::endl;
+//         return;
+//     }
+
+//     // print first 2 rows of image
+//     for (int i = 0; i < 2; i++)
+//     {
+//         for (int j = 0; j < width; j++)
+//         {
+//             std::cout << imageData[i * width + j] << " ";
+//         }
+//         std::cout << std::endl;
+//     }
+
+//     // Write image width and height to file
+//     file.write(reinterpret_cast<const char *>(&width), sizeof(int));
+//     file.write(reinterpret_cast<const char *>(&height), sizeof(int));
+
+//     // Write image data to file
+//     file.write(reinterpret_cast<const char *>(imageData), width * height);
+
+//     file.close();
+// }
+
+void write_image(const char *folder_name, char *name, float *data, int width, int height, int channels)
 {
-    std::ofstream file(filename, std::ios::out | std::ios::binary);
-    if (!file)
+    printf("Writing image to %s\n", folder_name);
+    // Create the output file path
+    std::string folder(folder_name);
+    std::string path = folder + "/" + (std::string)name;
+    printf("Trying to Writing image to %s\n", path.c_str());
+    // Allocate memory for unsigned char data
+    unsigned char *ucharData = new unsigned char[width * height * channels];
+
+    // Convert from float to unsigned char
+    for (int j = 0; j < width * height * channels; ++j)
     {
-        std::cerr << "Error: Unable to open file for writing." << std::endl;
-        return;
+        ucharData[j] = static_cast<unsigned char>(255.0f * std::max(0.0f, std::min(1.0f, data[j]))); // Clamp values to [0, 1] range
     }
 
-    // print first 2 rows of image
-    for (int i = 0; i < 2; i++)
+    // Write the image as a PNG
+    // if (!stbi_write_jpg(path.c_str(), width, height, channels, ucharData, 100))
+    if (!stbi_write_png(path.c_str(), width, height, channels, ucharData, width * channels))
     {
-        for (int j = 0; j < width; j++)
-        {
-            std::cout << imageData[i * width + j] << " ";
-        }
-        std::cout << std::endl;
+        printf("Failed to write image to %s\n", path.c_str());
+    }
+    else
+    {
+        printf("Image written to %s\n", path.c_str());
     }
 
-    // Write image width and height to file
-    file.write(reinterpret_cast<const char *>(&width), sizeof(int));
-    file.write(reinterpret_cast<const char *>(&height), sizeof(int));
-
-    // Write image data to file
-    file.write(reinterpret_cast<const char *>(imageData), width * height);
-
-    file.close();
+    // Free the allocated memory
+    delete[] ucharData;
 }
 
 // Device Kernels
 // __global__ void BatchConvolution(float image[IMAGE_HEIGHT][IMAGE_WIDTH][IMAGE_CHANNELS], float output_image[IMAGE_HEIGHT][IMAGE_WIDTH])
-// {
-//     int outRow = blockDim.y * blockIdx.y + threadIdx.y;
-//     int outCol = blockDim.x * blockIdx.x + threadIdx.x;
-
-//     // Boundary Cond
-//     if (outRow < IMAGE_HEIGHT && outCol < IMAGE_WIDTH)
-//     {
-//         float sum = 0;
-//         // Looping over mask :D
-//         for (int filterRow = 0; filterRow < FILTER_DIM; filterRow++)
-//         {
-//             for (int filterCol = 0; filterCol < FILTER_DIM; filterCol++)
-//             {
-//                 int inRow = outRow - FILTER_DIM / 2 + filterRow; // outRow - FilterRaduis + filterRow
-//                 int inCol = outCol - FILTER_DIM / 2 + filterCol; // outCol - FilterRaduis + filterCol
-
-//                 // Check if out of Bounday --> This is useless in case of padding
-//                 if (inRow >= 0 && inRow < IMAGE_HEIGHT && inCol >= 0 && inCol < IMAGE_WIDTH)
-//                 {
-//                     for (int c = 0; c < 3; c++)
-//                     {
-//                         // Every Channel
-//                         sum += filter_c[filterRow][filterCol] * (float)image[inRow][inCol][c];
-//                     }
-//                     // printf("%f.2    ",sum);
-//                     // printf("%u\n",(unsigned int)sum);
-//                 }
-//             }
-//         }
-//         // printf("%d\n", (int)output_image[outRow][outCol]);
-//         output_image[outRow][outCol] = (float)sum;
-//     }
-
-//     //    printf("Hello World\n");
-//     //    printf("%d\n", (int)output_image[outRow][outCol]);
-// }
-
-// Kernel adjusted for flattened array
 __global__ void BatchConvolution(float *image, float *output_image, int width, int height, int channels)
 {
-    int outCol = blockDim.x * blockIdx.x + threadIdx.x;
     int outRow = blockDim.y * blockIdx.y + threadIdx.y;
+    int outCol = blockDim.x * blockIdx.x + threadIdx.x;
 
-    if (outRow < height && outCol < width)
+    // Boundary Cond
+    if (outRow < IMAGE_HEIGHT && outCol < IMAGE_WIDTH)
     {
-        for (int c = 0; c < channels; c++)
-        { // Iterate over each color channel
-            float sum = 0.0f;
-            // Apply filter
-            for (int filterRow = -FILTER_DIM / 2; filterRow <= FILTER_DIM / 2; filterRow++)
+        float sum = 0;
+        // Looping over mask :D
+        for (int filterRow = 0; filterRow < FILTER_DIM; filterRow++)
+        {
+            for (int filterCol = 0; filterCol < FILTER_DIM; filterCol++)
             {
-                for (int filterCol = -FILTER_DIM / 2; filterCol <= FILTER_DIM / 2; filterCol++)
+                int inRow = outRow - FILTER_DIM / 2 + filterRow; // outRow - FilterRaduis + filterRow
+                int inCol = outCol - FILTER_DIM / 2 + filterCol; // outCol - FilterRaduis + filterCol
+
+                // Check if out of Bounday --> This is useless in case of padding
+                if (inRow >= 0 && inRow < IMAGE_HEIGHT && inCol >= 0 && inCol < IMAGE_WIDTH)
                 {
-                    int inRow = min(max(outRow + filterRow, 0), height - 1);
-                    int inCol = min(max(outCol + filterCol, 0), width - 1);
-                    int idx = (inRow * width + inCol) * channels + c;
-                    // int filterIdx = (filterRow + FILTER_DIM / 2) * FILTER_DIM + (filterCol + FILTER_DIM / 2);
-                    sum += image[idx] * filter_c[filterRow][filterCol];
+                    for (int c = 0; c < 3; c++)
+                    {
+                        // Every Channel
+                        sum += filter_c[filterRow][filterCol] * (float)image[(inRow * IMAGE_WIDTH + inCol) * IMAGE_CHANNELS + c];
+                    }
+                    // printf("%f.2    ",sum);
+                    // printf("%u\n",(unsigned int)sum);
                 }
             }
-            output_image[(outRow * width + outCol) * channels + c] = min(max(int(sum), 0), 255);
         }
+        // printf("%d\n", (int)output_image[outRow][outCol]);
+        // output_image[outRow][outCol] = (float)sum;
+        output_image[outRow * IMAGE_WIDTH + outCol] = (float)sum;
     }
+
+    //    printf("Hello World\n");
+    //    printf("%d\n", (int)output_image[outRow][outCol]);
 }
+
+// Kernel adjusted for flattened array
+// __global__ void BatchConvolution(float *image, float *output_image, int width, int height, int channels)
+// {
+//     int outCol = blockDim.x * blockIdx.x + threadIdx.x;
+//     int outRow = blockDim.y * blockIdx.y + threadIdx.y;
+
+//     if (outRow < height && outCol < width)
+//     {
+//         for (int c = 0; c < channels; c++)
+//         { // Iterate over each color channel
+//             float sum = 0.0f;
+//             // Apply filter
+//             for (int filterRow = -FILTER_DIM / 2; filterRow <= FILTER_DIM / 2; filterRow++)
+//             {
+//                 for (int filterCol = -FILTER_DIM / 2; filterCol <= FILTER_DIM / 2; filterCol++)
+//                 {
+//                     int inRow = min(max(outRow + filterRow, 0), height - 1);
+//                     int inCol = min(max(outCol + filterCol, 0), width - 1);
+//                     int idx = (inRow * width + inCol) * channels + c;
+//                     // int filterIdx = (filterRow + FILTER_DIM / 2) * FILTER_DIM + (filterCol + FILTER_DIM / 2);
+//                     sum += image[idx] * filter_c[filterRow][filterCol];
+//                 }
+//             }
+//             output_image[(outRow * width + outCol) * channels + c] = min(max(int(sum), 0), 255);
+//         }
+//     }
+// }
 int main(int argc, char *argv[])
 {
 
@@ -287,6 +321,7 @@ int main(int argc, char *argv[])
                 // print error
 
                 // Step(5) Transfer data back to host memory
+
                 cudaMemcpy(output, d_output, sizeof(float) * IMAGE_HEIGHT * IMAGE_WIDTH, cudaMemcpyDeviceToHost);
 
                 // Save Image
@@ -295,9 +330,18 @@ int main(int argc, char *argv[])
                 snprintf(out_file_path, sizeof(out_file_path), "%s/%s", output_dir, ent->d_name);
 
                 // print the first 2 rows of the image
+                for (int i = 0; i < 2; i++)
+                {
+                    for (int j = 0; j < IMAGE_WIDTH; j++)
+                    {
+                        printf("%f ", output[i * IMAGE_WIDTH + j]);
+                    }
+                    printf("\n");
+                }
+                // stbi_write_jpg(out_file_path, IMAGE_WIDTH, IMAGE_HEIGHT, 1, output, 90);
+                // writeImageToFile(out_file_path, output, IMAGE_WIDTH, IMAGE_HEIGHT);
 
-                stbi_write_jpg(out_file_path, IMAGE_WIDTH, IMAGE_HEIGHT, 1, output, 90);
-
+                write_image(output_dir, ent->d_name, output, IMAGE_WIDTH, IMAGE_HEIGHT, 1);
                 //         // Verifcation
                 //         // Perform convolution
                 //         for (int i = 0; i < IMAGE_HEIGHT; i++) {
