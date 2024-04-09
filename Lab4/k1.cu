@@ -1,5 +1,5 @@
 // nvcc -o out_1  ./k1.cu
-// out_1 ./input ./output ./filter.txt
+// ./out_1 ./input ./output ./filter.txt
 // nvprof out_2 ./testfile.txt ./out.txt
 
 
@@ -22,8 +22,8 @@
 #include "stb_image_write.h"
 
 #define FILTER_DIM 3
-#define IMAGE_WIDTH 148
-#define IMAGE_HEIGHT 222
+#define IMAGE_WIDTH 512
+#define IMAGE_HEIGHT 512
 #define IMAGE_CHANNELS 3
 
 // Declare Constant Memory 
@@ -103,7 +103,7 @@ __global__ void BatchConvolution(unsigned char image[IMAGE_HEIGHT][IMAGE_WIDTH][
     int outCol = blockDim.x * blockIdx.x + threadIdx.x;
 
     //Boundary Cond
-    if(outRow <IMAGE_WIDTH && outCol<IMAGE_HEIGHT){
+    if(outRow <IMAGE_HEIGHT  && outCol<IMAGE_WIDTH){
         float sum = 0;
         // Looping over mask :D
         for (int filterRow = 0; filterRow<FILTER_DIM; filterRow++){
@@ -112,7 +112,7 @@ __global__ void BatchConvolution(unsigned char image[IMAGE_HEIGHT][IMAGE_WIDTH][
                 int inCol = outCol - FILTER_DIM/2 + filterCol; // outCol - FilterRaduis + filterCol
 
                 // Check if out of Bounday --> This is useless in case of padding
-                if (inRow>=0 && inRow <IMAGE_WIDTH && inCol>=0 && inCol<IMAGE_HEIGHT){
+                if (inRow>=0 && inRow <IMAGE_HEIGHT && inCol>=0 && inCol<IMAGE_WIDTH){
                     for(int c=0;c<3;c++){
                         // Every Channel
                         sum+=filter_c[filterRow][filterCol]*(float)image[inRow][inCol][c];
@@ -144,6 +144,7 @@ int main(int argc, char* argv[]){
 
     // 2. initialize filter in constant memory
     cudaMemcpyToSymbol(filter_c,filter,FILTER_DIM*FILTER_DIM*sizeof(float));
+    printf("Allocated Filter in Constant Memory\n");
 
     // 3. Ouptut Memory
     // 3.1. Allocate Host
@@ -196,10 +197,10 @@ int main(int argc, char* argv[]){
 
                 // Step(2) Device Memory Allocation
                 float *d_image;
-                cudaMalloc((void**)&d_image, sizeof(unsigned char) * IMAGE_HEIGHT * IMAGE_WIDTH);
+                cudaMalloc((void**)&d_image, sizeof(unsigned char) * IMAGE_HEIGHT * IMAGE_WIDTH*IMAGE_CHANNELS);
 
                 // Step(3) Copy from host to deivce
-                cudaMemcpy(d_image, image, sizeof(unsigned char) * IMAGE_HEIGHT * IMAGE_WIDTH, cudaMemcpyHostToDevice);
+                cudaMemcpy(d_image, image, sizeof(unsigned char) * IMAGE_HEIGHT * IMAGE_WIDTH*IMAGE_CHANNELS, cudaMemcpyHostToDevice);
 
                 // Step(4) Call Kernel
                 // Kernel
