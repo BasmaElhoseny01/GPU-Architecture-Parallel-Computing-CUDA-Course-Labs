@@ -45,4 +45,4 @@ if __name__ == "__main__":
     main()
 
 
-# python 
+# python ./scripts/resize.py 512 256
