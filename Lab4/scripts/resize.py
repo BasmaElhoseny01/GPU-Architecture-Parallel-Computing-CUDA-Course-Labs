@@ -27,8 +27,8 @@ def resize_images(input_folder, output_folder, width, height):
 
 def main():
     # Set the input and output folders
-    input_folder = "input"  # Change this to the path of your input folder
-    output_folder = "input_resized"  # Change this to the path of your output folder
+    input_folder = "input_original"  # Change this to the path of your input folder
+    output_folder = "input"  # Change this to the path of your output folder
 
     # Check if correct number of arguments are provided
     if len(sys.argv) != 3:
