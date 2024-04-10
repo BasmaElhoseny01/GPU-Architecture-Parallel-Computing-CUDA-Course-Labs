@@ -377,18 +377,20 @@ int main(int argc, char *argv[])
                    // Reset Batch Counter
                     batch_counter=0;
 
-
-                    // // 3.9 Free Host Memory
-                    // free(image_data);
+                    // 3.9 Free Host Memory
                     free(output);
 
-                    // 3.10 Free Device Memory
-                    cudaFree(d_batched_images);
-                    cudaFree(d_output);
-
+                    // 3.9 Free Device  Memory
+                    cudaFree(d_output);  // calling cudaFree on a pointer doesn't zero out the pointer itself. It merely releases the memory that the pointer was pointing to on the GPU
                 }
             }
         }
+
+        // // 3.9 Free Host Memory
+
+        // 3.10 Free Device Memory
+        cudaFree(d_batched_images);
+      
 
         // Close the directory
         closedir(dir);
@@ -399,6 +401,7 @@ int main(int argc, char *argv[])
         perror("Failed to open Input directory");
         return EXIT_FAILURE;
     }
+
 
     // Free memory allocated for the filter in host memory
     free(filter);
