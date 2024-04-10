@@ -169,7 +169,7 @@ __global__ void BatchConvolution(float *image, float *output_image, int width, i
 {
     int outRow = blockDim.y * blockIdx.y + threadIdx.y;
     int outCol = blockDim.x * blockIdx.x + threadIdx.x;
-    // int outBatch = blockDim.z * blockIdx.z + threadIdx.z;
+    int outDepth = blockDim.z * blockIdx.z + threadIdx.z;
 
     // Boundary Cond
     if (outRow < height && outCol < width)
@@ -183,8 +183,7 @@ __global__ void BatchConvolution(float *image, float *output_image, int width, i
                 int inRow = outRow - filter_dim / 2 + filterRow; // outRow - FilterRaduis + filterRow
                 int inCol = outCol - filter_dim / 2 + filterCol; // outCol - FilterRaduis + filterCol
 
-                // if (batch_idx<batch_size){
-                // }
+          
 
                 // Apply boundary conditions (ghost cells)
                 inRow = max(0, min(inRow, height - 1));
@@ -197,12 +196,12 @@ __global__ void BatchConvolution(float *image, float *output_image, int width, i
                     for (int c = 0; c < 3; c++)
                     {
                         // Every Channel
-                        sum += filter_c[filterRow * filter_dim + filterCol] * (float)image[(inRow * width + inCol) * IMAGE_CHANNELS + c];
+                        sum += filter_c[filterRow * filter_dim + filterCol] * (float)image[(outDepth * height * width + inRow * width + inCol) * IMAGE_CHANNELS + c];
                     }
                 // }
             }
         }
-        output_image[outRow * width + outCol] = sum;
+        output_image[(outDepth * height * width) + (outRow * width) + outCol] = sum;
     }
 
 }
@@ -324,38 +323,38 @@ int main(int argc, char *argv[])
                     float *d_output; // Device pointer for the 2D array
                     cudaMalloc((void **)&d_output, sizeof(float) * height * width *batch_counter);
 
-        //             // for (int i = 0; i < 2; i++)
-        //             // {
-        //             //     for (int j = 0; j < width; j++)
-        //             //     {
-        //             //         printf("%f ", image_data[i * width + j]);
-        //             //     }
-        //             //     printf("\n");
-        //             // }
+                    // for (int i = 0; i < 2; i++)
+                    // {
+                    //     for (int j = 0; j < width; j++)
+                    //     {
+                    //         printf("%f ", d_batched_images[i * width + j]);
+                    //     }
+                    //     printf("\n");
+                    // }
 
               
-        //             // 3.6 Convolution
-        //             // Block Size
-        //             dim3 threadsPerBlock(16, 16,4);
-        //             // Grid Size
-        //             dim3 numBlocks((width + threadsPerBlock.x - 1) / threadsPerBlock.x,
-        //                         (height + threadsPerBlock.y - 1) / threadsPerBlock.y,
-        //                         (batch_counter + threadsPerBlock.z - 1) / threadsPerBlock.z);
-        //             // Call the kernel
-        //             printf("Calling Kernel\n");
-        //             // BatchConvolution<<<numBlocks, threadsPerBlock>>>(d_batched_images, d_output, width, height, batch_counter, filter_dim);
+                    // 3.6 Convolution
+                    // Block Size
+                    dim3 threadsPerBlock(16, 16,4);
+                    // Grid Size
+                    dim3 numBlocks((width + threadsPerBlock.x - 1) / threadsPerBlock.x,
+                                (height + threadsPerBlock.y - 1) / threadsPerBlock.y,
+                                (batch_counter + threadsPerBlock.z - 1) / threadsPerBlock.z);
 
-        //             // // If Error occurs in Kernel Execution Show it using cudaDeviceSynchronize,cudaGetLastError:D
-        //             // cudaDeviceSynchronize();
-        //             // cudaError_t error = cudaGetLastError();
-        //             // if (error != cudaSuccess)
-        //             // {
-        //             //     // in red
-        //             //     printf("\033[1;31m");
-        //             //     printf("CUDA error: %s\n", cudaGetErrorString(error));
-        //             //     // reset color
-        //             //     printf("\033[0m");
-        //             // }
+                    // Call the kernel
+                    BatchConvolution<<<numBlocks, threadsPerBlock>>>(d_batched_images, d_output, width, height, batch_counter, filter_dim);
+
+                    // If Error occurs in Kernel Execution Show it using cudaDeviceSynchronize,cudaGetLastError:D
+                    cudaDeviceSynchronize();
+                    cudaError_t error = cudaGetLastError();
+                    if (error != cudaSuccess)
+                    {
+                        // in red
+                        printf("\033[1;31m");
+                        printf("CUDA error: %s\n", cudaGetErrorString(error));
+                        // reset color
+                        printf("\033[0m");
+                    }
                     
                     // 3.7 Transfer output data back to host memory
                     cudaMemcpy(output, d_output, sizeof(float) * height * width * batch_counter, cudaMemcpyDeviceToHost);
@@ -373,19 +372,14 @@ int main(int argc, char *argv[])
                         // Concatenate directory path and filename
                         write_image(output_dir, image_filenames[i], output + (i * height * width), width, height, 1);
                     }
-        //             // // // 3.8 Save Image
-        //             // // // Concatenate directory path and filename
-        //             // // char out_file_path[256];
-        //             // // snprintf(out_file_path, sizeof(out_file_path), "%s/%s", output_dir, ent->d_name);
-        //             // // write_image(output_dir, ent->d_name, output, width, height, 1);
-
+  
 
                    // Reset Batch Counter
                     batch_counter=0;
 
 
-        //             // // 3.9 Free Host Memory
-        //             // free(image_data);
+                    // // 3.9 Free Host Memory
+                    // free(image_data);
                     free(output);
 
                     // 3.10 Free Device Memory
