@@ -1,5 +1,5 @@
 // nvcc -o out_1  ./k1.cu
-// ./out_1 ./input ./output ./filter.txt
+// ./out_1 ./input ./output ./filters/avg_9_9.txt
 // nvprof out_2 ./testfile.txt ./out.txt
 
 #include <stdio.h>
@@ -23,9 +23,8 @@
 #define IMAGE_CHANNELS 3
 
 // Declare Constant Memory
-// __constant__ float *filter_c;
+// Max is 400 floating element :D 
 __constant__ float filter_c[20 * 20];
-// __constant__ float filter_c[FILTER_DIM][FILTER_DIM];
 
 // Host Functions
 __host__ float *read_filter(const char *file_path,int &filter_dim)
@@ -60,35 +59,16 @@ __host__ float *read_filter(const char *file_path,int &filter_dim)
     return filter;
 }
 
-// __host__ float *read_image(const char *file_path)
-// {
-//     printf("Reading image at %s\n", file_path);
-
-//     int width, height, channels;
-//     // float *image = stbi_loadf(file_path, &width, &height, &channels, 0); // Each group of three consecutive elements in the array represents the RGB values of one pixel.
-//     unsigned char *image = stbi_load(file_path, &width, &height, &channels, 0); // Each group of three consecutive elements in the array represents the RGB values of one pixel.
-//     if (image == NULL)
-//     {
-//         printf("Error: Unable to open file %s\n", file_path);
-//         exit(1);
-//     }
-
-//     printf("Image size: %d x %d\n", width, height);
-//     printf("Channels: %d\n", channels);
-
-//     // assert (width == width);
-//     // assert (height == height);
-//     // assert (channels == IMAGE_CHANNELS);
-
-//     return image;
-// }
-void read_image(const char *filename, float **data, int *width, int *height, int *comp)
+__host__ void read_image(const char *filename, float **data, int *width, int *height, int *channels)
 {
-    unsigned char *udata = stbi_load(filename, width, height, comp, 0);
-    // convert data to float
-    *data = (float *)malloc((*width) * (*height) * (*comp) * sizeof(float));
+    //Read Image
+    unsigned char *udata = stbi_load(filename, width, height, channels, 0);
 
-    for (int i = 0; i < (*width) * (*height) * (*comp); i++)
+    // Host Memory Allocation & convert data from unsigned char to float
+    *data = (float *)malloc((*width) * (*height) * (*channels) * sizeof(float));
+
+    // Normlaize the data --> 0 to 1
+    for (int i = 0; i < (*width) * (*height) * (*channels); i++)
     {
         (*data)[i] = (float)udata[i] / 255.0f;
     }
@@ -98,71 +78,46 @@ void read_image(const char *filename, float **data, int *width, int *height, int
         printf("Error loading image.\n of name %s", filename);
         exit(1);
     }
+    // Free the loaded image
     stbi_image_free(udata);
-    printf("Image loaded: width = %d, height = %d, comp = %d\n", *width, *height, *comp);
+
+    printf("Image size: %d x %d x %d\n", *width, *height,*channels);
 }
-// void writeImageToFile(const char *filename, const float *imageData, int width, int height)
-// {
-//     std::ofstream file(filename, std::ios::out | std::ios::binary);
-//     if (!file)
-//     {
-//         std::cerr << "Error: Unable to open file for writing." << std::endl;
-//         return;
-//     }
 
-//     // print first 2 rows of image
-//     for (int i = 0; i < 2; i++)
-//     {
-//         for (int j = 0; j < width; j++)
-//         {
-//             std::cout << imageData[i * width + j] << " ";
-//         }
-//         std::cout << std::endl;
-//     }
-
-//     // Write image width and height to file
-//     file.write(reinterpret_cast<const char *>(&width), sizeof(int));
-//     file.write(reinterpret_cast<const char *>(&height), sizeof(int));
-
-//     // Write image data to file
-//     file.write(reinterpret_cast<const char *>(imageData), width * height);
-
-//     file.close();
-// }
 
 void write_image(const char *folder_name, char *name, float *data, int width, int height, int channels)
 {
-    printf("Writing image to %s\n", folder_name);
     // Create the output file path
     std::string folder(folder_name);
     std::string path = folder + "/" + (std::string)name;
-    printf("Trying to Writing image to %s\n", path.c_str());
+ 
+    printf("Writing image to %s\n", path.c_str());
+    
     // Allocate memory for unsigned char data
-    unsigned char *ucharData = new unsigned char[width * height * channels];
+    unsigned char *unsigned_char_data = new unsigned char[width * height * channels];
 
     // Convert from float to unsigned char
     for (int j = 0; j < width * height * channels; ++j)
     {
-        ucharData[j] = static_cast<unsigned char>(255.0f * std::max(0.0f, std::min(1.0f, data[j]))); // Clamp values to [0, 1] range
+        //Clipping 
+        unsigned_char_data[j] = static_cast<unsigned char>(255.0f * std::max(0.0f, std::min(1.0f, data[j]))); // Clamp values to [0, 1] range
     }
 
-    // Write the image as a PNG
-    // if (!stbi_write_jpg(path.c_str(), width, height, channels, ucharData, 100))
-    if (!stbi_write_png(path.c_str(), width, height, channels, ucharData, width * channels))
+    // Write the image to disk
+    if (!stbi_write_png(path.c_str(), width, height, channels, unsigned_char_data, width * channels))
     {
         printf("Failed to write image to %s\n", path.c_str());
     }
     else
     {
-        printf("Image written to %s\n", path.c_str());
+        printf("Sucessfully written to %s\n", path.c_str());
     }
 
     // Free the allocated memory
-    delete[] ucharData;
+    delete[] unsigned_char_data;
 }
 
 // Device Kernels
-// __global__ void BatchConvolution(float image[height][width][IMAGE_CHANNELS], float output_image[height][width])
 __global__ void BatchConvolution(float *image, float *output_image, int width, int height, int channels, int filter_dim)
 {
     int outRow = blockDim.y * blockIdx.y + threadIdx.y;
@@ -180,57 +135,28 @@ __global__ void BatchConvolution(float *image, float *output_image, int width, i
                 int inRow = outRow - filter_dim / 2 + filterRow; // outRow - FilterRaduis + filterRow
                 int inCol = outCol - filter_dim / 2 + filterCol; // outCol - FilterRaduis + filterCol
 
-                // Check if out of Bounday --> This is useless in case of padding
-                if (inRow >= 0 && inRow < height && inCol >= 0 && inCol < width)
-                {
+                // Apply boundary conditions (ghost cells)
+                inRow = max(0, min(inRow, height - 1));
+                inCol = max(0, min(inCol, width - 1));
+
+
+                // // Check if out of Bounday --> This is useless in case of padding
+                // if (inRow >= 0 && inRow < height && inCol >= 0 && inCol < width)
+                // {
                     for (int c = 0; c < 3; c++)
                     {
                         // Every Channel
-                        // printf("[%d][%d]%d\n",filterRow,filterCol,filterRow*filter_dim+filterCol);
                         sum += filter_c[filterRow * filter_dim + filterCol] * (float)image[(inRow * width + inCol) * IMAGE_CHANNELS + c];
-                        // sum += filter_c[filterRow][filterCol] * (float)image[(inRow * width + inCol) * IMAGE_CHANNELS + c];
                     }
-                    // printf("%f.2    ",sum);
-                    // printf("%u\n",(unsigned int)sum);
-                }
+                // }
             }
         }
-        // printf("%d\n", (int)output_image[outRow][outCol]);
-        // output_image[outRow][outCol] = (float)sum;
         output_image[outRow * width + outCol] = sum;
     }
 
-    //    printf("Hello World\n");
-    //    printf("%d\n", (int)output_image[outRow][outCol]);
 }
 
-// Kernel adjusted for flattened array
-// __global__ void BatchConvolution(float *image, float *output_image, int width, int height, int channels)
-// {
-//     int outCol = blockDim.x * blockIdx.x + threadIdx.x;
-//     int outRow = blockDim.y * blockIdx.y + threadIdx.y;
 
-//     if (outRow < height && outCol < width)
-//     {
-//         for (int c = 0; c < channels; c++)
-//         { // Iterate over each color channel
-//             float sum = 0.0f;
-//             // Apply filter
-//             for (int filterRow = -FILTER_DIM / 2; filterRow <= FILTER_DIM / 2; filterRow++)
-//             {
-//                 for (int filterCol = -FILTER_DIM / 2; filterCol <= FILTER_DIM / 2; filterCol++)
-//                 {
-//                     int inRow = min(max(outRow + filterRow, 0), height - 1);
-//                     int inCol = min(max(outCol + filterCol, 0), width - 1);
-//                     int idx = (inRow * width + inCol) * channels + c;
-//                     // int filterIdx = (filterRow + FILTER_DIM / 2) * FILTER_DIM + (filterCol + FILTER_DIM / 2);
-//                     sum += image[idx] * filter_c[filterRow][filterCol];
-//                 }
-//             }
-//             output_image[(outRow * width + outCol) * channels + c] = min(max(int(sum), 0), 255);
-//         }
-//     }
-// }
 int main(int argc, char *argv[])
 {
 
@@ -245,27 +171,17 @@ int main(int argc, char *argv[])
     int filter_dim;
     float *filter = read_filter(filter_pth,filter_dim);
 
-    // Allocate memory for the filter in constant memory
-    // cudaMalloc(&filter_c, filter_dim * filter_dim * sizeof(float));
 
-    // 2. initialize filter in constant memory
+    // 2. Copy Filter to Constant Memory
     cudaMemcpyToSymbol(filter_c, filter, filter_dim * filter_dim * sizeof(float));
 
-    // Free dynamically allocated memory
-    // free(filter);
-    printf("Allocated Filter in Constant Memory\n");
-
-    // 3. Ouptut Memory
-    // 3.1. Allocate Host
-
+    // 3. Process Images
     // Open the input directory
     DIR *dir;
     struct dirent *ent;
     if ((dir = opendir(input_dir)) != NULL)
     {
         printf("Reading Images from Directory: %s\n", input_dir);
-
-        // int index = 0;
 
         // Iterate over each file in the directory
         while ((ent = readdir(dir)) != NULL)
@@ -279,14 +195,24 @@ int main(int argc, char *argv[])
                 snprintf(file_path, sizeof(file_path), "%s/%s", input_dir, ent->d_name);
 
                 printf("Reading Image: %s\n", file_path);
-                // float *image_data = read_image(file_path);
+
                 float *image_data;
                 int width, height, channels;
+                // 3.1 Host memory allocation & Read Image and 
                 read_image(file_path, &image_data, &width, &height, &channels);
-                // float *output = (float *)malloc(sizeof(float) * height * width);
-                float *output = (float *)malloc(sizeof(float) * height * width);
 
-                // 3.1. Allocate Device
+                // 3.2 Device Memory Allocation for input                
+                float *d_image;
+                cudaMalloc((void **)&d_image, sizeof(float) * height * width * channels);
+
+                // 3.3 Transfer input data to device memory
+                cudaMemcpy(d_image, image_data, sizeof(float) * height * width * channels, cudaMemcpyHostToDevice);
+
+
+                // 3.4 Host Memory Allocation for output
+                float *output = (float *)malloc(sizeof(float) * height * width);
+                
+                // 3.5 Device Memory Allocation for output
                 float *d_output; // Device pointer for the 2D array
                 cudaMalloc((void **)&d_output, sizeof(float) * height * width);
 
@@ -299,21 +225,21 @@ int main(int argc, char *argv[])
                 //     printf("\n");
                 // }
 
-                // Step(2) Device Memory Allocation
-                float *d_image;
-                cudaMalloc((void **)&d_image, sizeof(float) * height * width * channels);
+                // 
+               
 
-                // Step(3) Copy from host to deivce
-                cudaMemcpy(d_image, image_data, sizeof(float) * height * width * channels, cudaMemcpyHostToDevice);
+           
 
-                // Step(4) Call Kernel
-                // Kernel
-                dim3 threadsPerBlock(16, 16); // Example block size, can be adjusted based on your GPU's architecture
+                // 3.6 Convolution
+                // Block Size
+                dim3 threadsPerBlock(16, 16);
+                // Grid Size
                 dim3 numBlocks((width + threadsPerBlock.x - 1) / threadsPerBlock.x,
                                (height + threadsPerBlock.y - 1) / threadsPerBlock.y);
                 // Call the kernel
                 BatchConvolution<<<numBlocks, threadsPerBlock>>>(d_image, d_output, width, height, IMAGE_CHANNELS, filter_dim);
-                // BatchConvolution<<<GridSize, ThreadsPerBlock>>>((float(*)[width][IMAGE_CHANNELS])d_image, (float(*)[width])d_output);
+
+                // If Errro occurs in Kernel Execution Show it using cudaDeviceSynchronize,cudaGetLastError:D
                 cudaDeviceSynchronize();
                 cudaError_t error = cudaGetLastError();
                 if (error != cudaSuccess)
@@ -324,31 +250,17 @@ int main(int argc, char *argv[])
                     // reset color
                     printf("\033[0m");
                 }
-                // cudaGetErrorString(cudaGetLastError());
-                // print error
-
-                // Step(5) Transfer data back to host memory
-
+                
+                // 3.7 Transfer output data back to host memory
                 cudaMemcpy(output, d_output, sizeof(float) * height * width, cudaMemcpyDeviceToHost);
 
-                // Save Image
+                // 3.8 Save Image
                 // Concatenate directory path and filename
                 char out_file_path[256];
                 snprintf(out_file_path, sizeof(out_file_path), "%s/%s", output_dir, ent->d_name);
-
-                // // print the first 2 rows of the image
-                // for (int i = 0; i < 2; i++)
-                // {
-                //     for (int j = 0; j < width; j++)
-                //     {
-                //         printf("%f ", output[i * width + j]);
-                //     }
-                //     printf("\n");
-                // }
-                // stbi_write_jpg(out_file_path, width, height, 1, output, 90);
-                // writeImageToFile(out_file_path, output, width, height);
-
                 write_image(output_dir, ent->d_name, output, width, height, 1);
+
+
                 //         // Verifcation
                 //         // Perform convolution
                 //         for (int i = 0; i < height; i++) {
@@ -376,26 +288,31 @@ int main(int argc, char *argv[])
                 //         // Process the file here
                 //         // Example: Load image using ent->d_name
 
-                // free memory
+                // 3.9 Free Host Memory
                 free(image_data);
                 free(output);
+
+                // 3.10 Free Device Memory
                 cudaFree(d_image);
                 cudaFree(d_output);
             }
         }
 
+        // Close the directory
         closedir(dir);
     }
     else
     {
         // Failed to open directory
-        // Can;t open directory at path
         perror("Failed to open Input directory");
         return EXIT_FAILURE;
     }
 
+    // Free memory allocated for the filter in host memory
+    free(filter);
+
     // Free memory allocated for the filter in constant memory
-    // cudaFree(filter_c);
+    cudaFree(filter_c);
 
     // // Images as Batches
     // for(int batch_idx=0;batch_idx<batch_size;batch_idx++){
