@@ -106,10 +106,16 @@ __host__ void get_dimensions(const char* input_dir, int* width, int* height, int
 }
 
 // __host__ void read_images_batch
-__host__ void read_image(const char *filename, float **data, int *width, int *height, int *channels)
+__host__ void read_image(const char *folder_name, char *file_name, float **data, int *width, int *height, int *channels)
 {
+    // Concatenate directory path and filename
+    char file_path[256];
+    snprintf(file_path, sizeof(file_path), "%s/%s", folder_name, file_name);
+
+    printf("Reading Image: %s\n", file_path);
+
     //Read Image
-    unsigned char *udata = stbi_load(filename, width, height, channels, 0);
+    unsigned char *udata = stbi_load(file_path, width, height, channels, 0);
 
     // Host Memory Allocation & convert data from unsigned char to float
     *data = (float *)malloc((*width) * (*height) * (*channels) * sizeof(float));
@@ -122,7 +128,7 @@ __host__ void read_image(const char *filename, float **data, int *width, int *he
 
     if (*data == NULL)
     {
-        printf("Error loading image.\n of name %s", filename);
+        printf("Error loading image at %s", file_path);
         exit(1);
     }
     // Free the loaded image
@@ -132,11 +138,11 @@ __host__ void read_image(const char *filename, float **data, int *width, int *he
 }
 
 
-__host__ void write_image(const char *folder_name, char *name, float *data, int width, int height, int channels)
+__host__ void write_image(const char *folder_name, char *file_name, float *data, int width, int height, int channels)
 {
     // Create the output file path
     std::string folder(folder_name);
-    std::string path = folder + "/" + (std::string)name;
+    std::string path = folder + "/" + (std::string)file_name;
  
     printf("Writing image to %s\n", path.c_str());
     
@@ -154,10 +160,6 @@ __host__ void write_image(const char *folder_name, char *name, float *data, int 
     if (!stbi_write_png(path.c_str(), width, height, channels, unsigned_char_data, width * channels))
     {
         printf("Failed to write image to %s\n", path.c_str());
-    }
-    else
-    {
-        printf("Sucessfully written to %s\n", path.c_str());
     }
 
     // Free the allocated memory
@@ -203,7 +205,6 @@ __global__ void BatchConvolution(float *image, float *output_image, int width, i
         }
         output_image[(outDepth * height * width) + (outRow * width) + outCol] = sum;
     }
-
 }
 
 
@@ -256,166 +257,159 @@ int main(int argc, char *argv[])
     cudaMemcpyToSymbol(filter_c, filter, filter_dim * filter_dim * sizeof(float));
 
     // 3. Process Images
-    // Open the input directory
+    printf("Reading Images from Directory: %s\n", input_dir);
+
+    // 3.1. Get Images Dimensions
+    int IMAGE_WIDTH, IMAGE_HEIGHT, image_channels;
+    get_dimensions(input_dir, &IMAGE_WIDTH, &IMAGE_HEIGHT, &image_channels);
+
+    // 3.2. Host Memory Allocations
+    // Allocate memory to store filenames for each image in the batch
+    char **image_filenames = (char **)malloc(batch_size * sizeof(char *));
+    // Allocate memory for each individual filename string
+    for (int i = 0; i < batch_size; i++) {
+        image_filenames[i] = (char *)malloc(256 * sizeof(char)); // Assuming max filename length is 256
+    }
+
+    // 3.3. Device Memory Allocations
+    // Allocate device memory for batched input
+    float *d_batched_images;
+    cudaMalloc((void **)&d_batched_images, sizeof(float) * IMAGE_WIDTH * IMAGE_HEIGHT * IMAGE_CHANNELS * batch_size);
+
+
+    // 4. Process Images in Batches
     DIR *dir;
     struct dirent *ent;
+
+    int batch_idx=0;
     if ((dir = opendir(input_dir)) != NULL)
     {
-        printf("Reading Images from Directory: %s\n", input_dir);
+        while(1){
+            printf("\n\nBatch [%d] n",batch_idx);
+            batch_idx++;
 
-        // Step(1) Get Images Dimensions
-        int IMAGE_WIDTH, IMAGE_HEIGHT, image_channels;
-        get_dimensions(input_dir, &IMAGE_WIDTH, &IMAGE_HEIGHT, &image_channels);
-
-        // Allocate device memory for batched input
-        float *d_batched_images;
-        cudaMalloc((void **)&d_batched_images, sizeof(float) * IMAGE_WIDTH * IMAGE_HEIGHT * IMAGE_CHANNELS * batch_size);
-        
-        // Allocate memory to store filenames for each image in the batch
-        char **image_filenames = (char **)malloc(batch_size * sizeof(char *));
-
-        // Counter for Batch
-        int batch_counter=0;
-
-        // Iterate over each file in the directory
-        while ((ent = readdir(dir)) != NULL)
-        {
-            // Filter out directories and special entries
-            if (ent->d_type == DT_REG)
-            {
-                // Step(1) Read Image
-                image_filenames[batch_counter] = (char *)malloc(256 * sizeof(char)); // Assuming maximum filename length is 256
-                snprintf(image_filenames[batch_counter], 256, "%s",ent->d_name);            
-                
-                // Concatenate directory path and filename
-                char file_path[256];
-                snprintf(file_path, sizeof(file_path), "%s/%s", input_dir, ent->d_name);
-
-                printf("Reading Image: %s\n", file_path);
-
-                float *image_data;
-                int width, height, channels;
-                // 3.1 Host memory allocation & Read Image and 
-                // read_image(file_path, &image_data, &width, &height, &channels);
-                read_image(file_path, &image_data, &width, &height, &channels);
-
-                // // 3.2 Device Memory Allocation for input                
-                // float *d_image;
-                // cudaMalloc((void **)&d_image, sizeof(float) * height * width * channels);
-
-                // 3.3 Transfer input data to device memory
-                cudaMemcpy(d_batched_images + batch_counter * IMAGE_WIDTH * IMAGE_HEIGHT * IMAGE_CHANNELS, image_data, sizeof(float) * height * width * IMAGE_CHANNELS, cudaMemcpyHostToDevice);
-
-                // Free host memory for image data
-                free(image_data);
-
-                // Increment Batch Counter
-                batch_counter++;
-
-                if (batch_counter == batch_size /* no more images[TODO] */){
-                    printf("Batch Completed\n");
-                    // Complete Batch is ready then Process it :D
-
-                    // 3.4 Host Memory Allocation for output
-                    float *output = (float *)malloc(sizeof(float) * height * width * batch_counter);
-                    
-                    // 3.5 Device Memory Allocation for output
-                    float *d_output; // Device pointer for the 2D array
-                    cudaMalloc((void **)&d_output, sizeof(float) * height * width *batch_counter);
-
-                    // for (int i = 0; i < 2; i++)
-                    // {
-                    //     for (int j = 0; j < width; j++)
-                    //     {
-                    //         printf("%f ", d_batched_images[i * width + j]);
-                    //     }
-                    //     printf("\n");
-                    // }
-
-              
-                    // 3.6 Convolution
-                    // Block Size
-                    dim3 threadsPerBlock(16, 16,4);
-                    // Grid Size
-                    dim3 numBlocks((width + threadsPerBlock.x - 1) / threadsPerBlock.x,
-                                (height + threadsPerBlock.y - 1) / threadsPerBlock.y,
-                                (batch_counter + threadsPerBlock.z - 1) / threadsPerBlock.z);
-
-                    // Call the kernel
-                    BatchConvolution<<<numBlocks, threadsPerBlock>>>(d_batched_images, d_output, width, height, batch_counter, filter_dim);
-
-                    // If Error occurs in Kernel Execution Show it using cudaDeviceSynchronize,cudaGetLastError:D
-                    cudaDeviceSynchronize();
-                    cudaError_t error = cudaGetLastError();
-                    if (error != cudaSuccess)
-                    {
-                        // in red
-                        printf("\033[1;31m");
-                        printf("CUDA error: %s\n", cudaGetErrorString(error));
-                        // reset color
-                        printf("\033[0m");
-                    }
-                    
-                    // 3.7 Transfer output data back to host memory
-                    cudaMemcpy(output, d_output, sizeof(float) * height * width * batch_counter, cudaMemcpyDeviceToHost);
-
-                
-                    printf("Batch Processed\n");
-                    printf("batch_counter: %d\n",batch_counter);
+            // Counter for images in batch
+            int batch_counter=0;
 
 
-                    // Save Batched Processed Images
-                    for (int i = 0; i < batch_counter; i++)
-                    {
-                        printf("Saving Image %d\n",i);
-                        // 3.8 Save Image
-                        // Concatenate directory path and filename
-                        write_image(output_dir, image_filenames[i], output + (i * height * width), width, height, 1);
-                    }
-  
-
-                   // Reset Batch Counter
-                    batch_counter=0;
-
-                    // 3.9 Free Host Memory
-                    free(output);
-
-                    // 3.9 Free Device  Memory
-                    cudaFree(d_output);  // calling cudaFree on a pointer doesn't zero out the pointer itself. It merely releases the memory that the pointer was pointing to on the GPU
+            // Step(1) Read Images Batches
+            while (batch_counter<batch_size){
+                if ((ent = readdir(dir)) == NULL){
+                    // No more files
+                    break;
                 }
+
+                // Filter out directories and special entries
+                if (ent->d_type == DT_REG){
+
+                    // Read Image
+                    snprintf(image_filenames[batch_counter], 256, "%s",ent->d_name);    
+                        
+                    float *image_data;
+                    int width, height, channels;
+                    // Host memory allocation & Read Image and 
+                    read_image(input_dir,ent->d_name, &image_data, &width, &height, &channels);
+
+
+                    // Check on input image dimensions
+                    assert (width == IMAGE_WIDTH && height == IMAGE_HEIGHT);
+
+                    // Transfer input data to device memory
+                    cudaMemcpy(d_batched_images + batch_counter * IMAGE_WIDTH * IMAGE_HEIGHT * IMAGE_CHANNELS, image_data, sizeof(float) * height * width * IMAGE_CHANNELS, cudaMemcpyHostToDevice);
+
+                    // Free host memory for image data
+                    free(image_data);        
+
+                    // Increment Batch Counter
+                    batch_counter++;          
+                }
+
+            }
+
+            if (batch_counter==0){
+                // Empty Batch
+                break;
+            }
+
+
+            // Step(2) Process Batch
+            printf("Prepocessing Batch ...\n");
+
+            // Host Memory Allocation for output
+            float *output = (float *)malloc(sizeof(float) * IMAGE_WIDTH * IMAGE_HEIGHT * batch_counter);
+
+            // Device Memory Allocation for output
+            float *d_output; // Device pointer for the 2D array
+            cudaMalloc((void **)&d_output, sizeof(float) * IMAGE_WIDTH * IMAGE_HEIGHT *batch_counter);
+
+
+            // Convolution
+            // Block Size
+            dim3 threadsPerBlock(16, 16,4);
+            // Grid Size
+            dim3 numBlocks((IMAGE_WIDTH + threadsPerBlock.x - 1) / threadsPerBlock.x,
+                            (IMAGE_HEIGHT + threadsPerBlock.y - 1) / threadsPerBlock.y,
+                            (batch_counter + threadsPerBlock.z - 1) / threadsPerBlock.z);
+
+            // Call the kernel
+            BatchConvolution<<<numBlocks, threadsPerBlock>>>(d_batched_images, d_output, IMAGE_WIDTH, IMAGE_HEIGHT, batch_counter, filter_dim);
+
+            // If Error occurs in Kernel Execution Show it using cudaDeviceSynchronize,cudaGetLastError:D
+            cudaDeviceSynchronize();
+            cudaError_t error = cudaGetLastError();
+            if (error != cudaSuccess)
+            {
+                // in red
+                printf("\033[1;31m");
+                printf("CUDA error: %s\n", cudaGetErrorString(error));
+                // reset color
+                printf("\033[0m");
+            }
+                
+            // Transfer output data back to host memory
+            cudaMemcpy(output, d_output, sizeof(float) * IMAGE_HEIGHT * IMAGE_WIDTH * batch_counter, cudaMemcpyDeviceToHost);
+
+            // Free Device Memory
+            cudaFree(d_output);
+
+
+            // Step(3) Save output images Batch
+            printf("Writing Batch ...\n");
+            for (int i = 0; i < batch_counter; i++)
+            {                
+                // 3.8 Save Image
+                // Concatenate directory path and filename
+                write_image(output_dir, image_filenames[i], output + (i * IMAGE_HEIGHT * IMAGE_WIDTH), IMAGE_WIDTH, IMAGE_HEIGHT, 1);
+            }
+
+            // Free Host Memory
+            free(output);
+
+
+        if (batch_counter<batch_size){
+                break;
             }
         }
 
-        // // 3.9 Free Host Memory
+        // // Free Host Memory
+        // // Free memory allocated for the filter in host memory
+        // free(filter);
+        // // Free memory allocated for the filter in host memory
+        // free(image_filenames);
 
-        // 3.10 Free Device Memory
-        cudaFree(d_batched_images);
-      
 
-        // Close the directory
+        // // Free Device Memory
+        // // Free memory allocated for the filter in constant memory
+        // cudaFree(filter_c);
+        // // Free memory allocated for the batched images in device shared memory
+        // cudaFree(d_batched_images);
+
+
+        // Close the diresctory
         closedir(dir);
     }
-    else
-    {
-        // Failed to open directory
-        perror("Failed to open Input directory");
-        return EXIT_FAILURE;
+    else{
+        // Error opening directory
+        perror("Unable to open directory");
     }
-
-
-    // Free memory allocated for the filter in host memory
-    free(filter);
-
-    // Free memory allocated for the filter in constant memory
-    cudaFree(filter_c);
-
-    // // Images as Batches
-    // for(int batch_idx=0;batch_idx<batch_size;batch_idx++){
-    //     // 2. Reading Image
-    //     // float* image = read_image(file_path){
-
-    //     // }
-
-    //     // read_image(input_folder_pth);
-    // }
 }
