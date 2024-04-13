@@ -1,3 +1,5 @@
+// Match Input Tile
+
 // nvcc -o out_1  ./k1.cu
 // ./out_1 ./input ./output_k1 2 ./filters/avg_9_9.txt
 // nvprof out_2 ./testfile.txt ./out.txt
