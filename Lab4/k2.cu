@@ -294,28 +294,34 @@ __global__ void input_tile_convolution(float *image, float *output_image, int wi
 
     // compute the output tile
 
+    int tile_row = threadIdx.y - (filter_dim / 2);
+    int tile_col = threadIdx.x - (filter_dim / 2);
     if (threadIdx.x < OUTPUT_TILE_DIM && threadIdx.y < OUTPUT_TILE_DIM)
     {
-        float sum = 0;
-        for (int filterRow = 0; filterRow < filter_dim; filterRow++)
+        if (tile_row >= 0 && tile_row < OUTPUT_TILE_DIM && tile_col >= 0 && tile_col < OUTPUT_TILE_DIM)
         {
-            for (int filterCol = 0; filterCol < filter_dim; filterCol++)
+            float sum = 0;
+
+            for (int filterRow = 0; filterRow < filter_dim; filterRow++)
             {
-
-                for (int c = 0; c < 3; c++)
+                for (int filterCol = 0; filterCol < filter_dim; filterCol++)
                 {
-                    // TODO : access shared mem sa7
-                    sum += filter_c[filterRow * filter_dim + filterCol] * // sh_mem[(threadIdx.y + filterRow) * blockDim.x * IMAGE_CHANNELS + (threadIdx.x + filterCol) * IMAGE_CHANNELS + c];
-                           sh_mem[(threadIdx.y * blockDim.x + threadIdx.x) * IMAGE_CHANNELS + c];
 
-                    // printf("Shem %f\n", sh_mem[(threadIdx.y + filterRow) * blockDim.x * IMAGE_CHANNELS + (threadIdx.x + filterCol) * IMAGE_CHANNELS + c]);
+                    for (int c = 0; c < 3; c++)
+                    {
+                        // TODO : access shared mem sa7
+                        sum += filter_c[filterRow * filter_dim + filterCol] * // sh_mem[(threadIdx.y + filterRow) * blockDim.x * IMAGE_CHANNELS + (threadIdx.x + filterCol) * IMAGE_CHANNELS + c];
+                               sh_mem[((tile_row + filterRow) * blockDim.x + (tile_col + filterCol)) * IMAGE_CHANNELS + c];
+
+                        // printf("Shem %f\n", sh_mem[(threadIdx.y + filterRow) * blockDim.x * IMAGE_CHANNELS + (threadIdx.x + filterCol) * IMAGE_CHANNELS + c]);
+                    }
                 }
             }
-        }
 
-        // printf("Sum %f", sum);
-        // output_image[(in_row * OUTPUT_TILE_DIM + in_col)] = sum;
-        output_image[blockIdx.x * OUTPUT_TILE_DIM + threadIdx.x + blockIdx.y * gridDim.x * blockDim.x] = sum;
+            // printf("Sum %f", sum);
+            // output_image[(in_row * OUTPUT_TILE_DIM + in_col)] = sum;
+            output_image[blockIdx.x * OUTPUT_TILE_DIM + threadIdx.x + blockIdx.y * gridDim.x * blockDim.x] = sum;
+        }
     }
 }
 
