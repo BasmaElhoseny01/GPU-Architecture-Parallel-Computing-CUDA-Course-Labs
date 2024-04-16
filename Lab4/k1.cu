@@ -176,6 +176,7 @@ __host__ void write_image(const char *folder_name, char *file_name, float *data,
 // Device Kernels
 __global__ void BatchConvolution(float *image, float *output_image, int width, int height, int batch_size, int filter_dim)
 {
+    // Each Thread is responsible for one pixel in the output image
     int outRow = blockDim.y * blockIdx.y + threadIdx.y;
     int outCol = blockDim.x * blockIdx.x + threadIdx.x;
     int outDepth = blockDim.z * blockIdx.z + threadIdx.z;
