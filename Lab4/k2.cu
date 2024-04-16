@@ -297,8 +297,9 @@ __global__ void input_tile_convolution(float *image, float *output_image, int wi
 
         for (int c = 0; c < 3; c++)
         {
-            sh_mem[(threadIdx.y * blockDim.x + threadIdx.x) * IMAGE_CHANNELS + c] = image[((out_row+filter_dim / 2) * width + (out_col+filter_dim / 2)) * IMAGE_CHANNELS + c];
+            // sh_mem[(threadIdx.y * blockDim.x + threadIdx.x) * IMAGE_CHANNELS + c] = image[((out_row+filter_dim / 2) * width + (out_col+filter_dim / 2)) * IMAGE_CHANNELS + c];
             // sh_mem[(threadIdx.y * blockDim.x + threadIdx.x) * IMAGE_CHANNELS + c] = image[((out_row) * width + (out_col)) * IMAGE_CHANNELS + c];
+            sh_mem[(threadIdx.y * blockDim.x + threadIdx.x) * IMAGE_CHANNELS + c] = image[((out_row) * width + (out_col)) * IMAGE_CHANNELS + c];
             // sh_mem[(threadIdx.y * blockDim.x + threadIdx.x) * IMAGE_CHANNELS + c] = image[(in_row * width + in_col) * IMAGE_CHANNELS + c];
         }
     }
