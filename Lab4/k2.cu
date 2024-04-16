@@ -296,6 +296,13 @@ __global__ void input_tile_convolution(float *image, float *output_image, int wi
             sh_mem[(threadIdx.y * blockDim.x + threadIdx.x) * IMAGE_CHANNELS + c] = image[(in_row * width + in_col) * IMAGE_CHANNELS + c];
         }
     }
+    else{
+        // Add Zeros For Padding :D
+        for (int c = 0; c < 3; c++)
+        {
+            sh_mem[(threadIdx.y * blockDim.x + threadIdx.x) * IMAGE_CHANNELS + c] = 0;
+        }
+    }
 
     // else
     // {
