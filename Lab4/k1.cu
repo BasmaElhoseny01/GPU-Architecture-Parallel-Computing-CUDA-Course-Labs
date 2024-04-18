@@ -15,10 +15,10 @@
 #include <dirent.h>
 
 #define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
+#include "stb/stb_image.h"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "stb_image_write.h"
+#include "stb/stb_image_write.h"
 
 #define IMAGE_CHANNELS 3
 
@@ -182,7 +182,7 @@ __global__ void BatchConvolution(float *image, float *output_image, int width, i
     int outDepth = blockDim.z * blockIdx.z + threadIdx.z;
 
     // Boundary Cond
-    if (outRow < height && outCol < width)
+    if (outRow < height && outCol < width && outDepth < batch_size)
     {
         float sum = 0;
         // Looping over mask :D
@@ -354,6 +354,8 @@ int main(int argc, char *argv[])
             dim3 numBlocks((IMAGE_WIDTH + threadsPerBlock.x - 1) / threadsPerBlock.x,
                            (IMAGE_HEIGHT + threadsPerBlock.y - 1) / threadsPerBlock.y,
                            (batch_counter + threadsPerBlock.z - 1) / threadsPerBlock.z);
+
+            printf("batch counter %i\n", (batch_counter + threadsPerBlock.z - 1) / threadsPerBlock.z);
 
             // Call the kernel
             BatchConvolution<<<numBlocks, threadsPerBlock>>>(d_batched_images, d_output, IMAGE_WIDTH, IMAGE_HEIGHT, batch_counter, filter_dim);
