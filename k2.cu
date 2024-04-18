@@ -176,101 +176,6 @@ __host__ void write_image(const char *folder_name, char *file_name, float *data,
     delete[] unsigned_char_data;
 }
 
-// Device Kernels
-__global__ void BatchConvolution(float *image, float *output_image, int width, int height, int batch_size, int filter_dim)
-{
-    int outRow = blockDim.y * blockIdx.y + threadIdx.y;
-    int outCol = blockDim.x * blockIdx.x + threadIdx.x;
-    int outDepth = blockDim.z * blockIdx.z + threadIdx.z;
-
-    // Boundary Cond
-    if (outRow < height && outCol < width)
-    {
-        float sum = 0;
-        // Looping over mask :D
-        for (int filterRow = 0; filterRow < filter_dim; filterRow++)
-        {
-            for (int filterCol = 0; filterCol < filter_dim; filterCol++)
-            {
-                int inRow = outRow - filter_dim / 2 + filterRow; // outRow - FilterRaduis + filterRow
-                int inCol = outCol - filter_dim / 2 + filterCol; // outCol - FilterRaduis + filterCol
-
-                // Apply boundary conditions (ghost cells)
-                inRow = max(0, min(inRow, height - 1));
-                inCol = max(0, min(inCol, width - 1));
-
-                // // Check if out of Bounday --> This is useless in case of padding
-                // if (inRow >= 0 && inRow < height && inCol >= 0 && inCol < width)
-                // {
-                for (int c = 0; c < 3; c++)
-                {
-                    // Every Channel
-                    sum += filter_c[filterRow * filter_dim + filterCol] * (float)image[(outDepth * height * width + inRow * width + inCol) * IMAGE_CHANNELS + c];
-                }
-                // }
-            }
-        }
-        output_image[(outDepth * height * width) + (outRow * width) + outCol] = sum;
-    }
-}
-
-__global__ void input_tile_convolution_gpt(float *image, float *output_image, int width, int height, int batch_size, int filter_dim)
-{
-    // Shared Memory
-    __shared__ float shared_image[16][16][4];
-
-    // Load the Tile
-    int inRow = blockDim.y * blockIdx.y + threadIdx.y;
-    int inCol = blockDim.x * blockIdx.x + threadIdx.x;
-    int inDepth = blockDim.z * blockIdx.z + threadIdx.z;
-
-    // Load the Tile
-    if (inRow < height && inCol < width)
-    {
-        for (int c = 0; c < 3; c++)
-        {
-            shared_image[threadIdx.y][threadIdx.x][threadIdx.z] = image[(inDepth * height * width + inRow * width + inCol) * IMAGE_CHANNELS + c];
-        }
-    }
-
-    __syncthreads();
-
-    // Convolution
-    int outRow = inRow;
-    int outCol = inCol;
-    int outDepth = inDepth;
-
-    // Boundary Cond
-    if (outRow < height && outCol < width)
-    {
-        float sum = 0;
-        // Looping over mask :D
-        for (int filterRow = 0; filterRow < filter_dim; filterRow++)
-        {
-            for (int filterCol = 0; filterCol < filter_dim; filterCol++)
-            {
-                int inRow = outRow - filter_dim / 2 + filterRow; // outRow - FilterRaduis + filterRow
-                int inCol = outCol - filter_dim / 2 + filterCol; // outCol - FilterRaduis + filterCol
-
-                // Apply boundary conditions (ghost cells)
-                inRow = max(0, min(inRow, height - 1));
-                inCol = max(0, min(inCol, width - 1));
-
-                // // Check if out of Bounday --> This is useless in case of padding
-                // if (inRow >= 0 && inRow < height && inCol >= 0 && inCol < width)
-                // {
-                for (int c = 0; c < 3; c++)
-                {
-                    // Every Channel
-                    sum += filter_c[filterRow * filter_dim + filterCol] * shared_image[inRow % 16][inCol % 16][c];
-                }
-                // }
-            }
-        }
-        output_image[(outDepth * height * width) + (outRow * width) + outCol] = sum;
-    }
-}
-
 __global__ void input_tile_convolution(float *image, float *output_image, int width, int height, int batch_size, int filter_dim)
 {
     int in_depth = blockDim.z * blockIdx.z + threadIdx.z;
@@ -322,7 +227,6 @@ __global__ void input_tile_convolution(float *image, float *output_image, int wi
             }
         }
         output_image[out_row * width + out_col] = sum;
-
     }
 }
 
