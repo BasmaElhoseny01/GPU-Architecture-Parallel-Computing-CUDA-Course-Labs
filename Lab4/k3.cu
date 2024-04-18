@@ -286,9 +286,8 @@ __global__ void output_tile_convolution(float *image, float *output_image, int w
 
         if (lin_row >= 0 && lin_col >= 0 && lin_col < width && lin_row < height)
         {
-            if (blockIdx.x == 1 && blockIdx.y == 2)
+            if (blockIdx.x == 0 && blockIdx.y == 0)
             {
-                printf("START X [%i] Y [%i]\n", start_index_x, start_index_y);
                 printf("input[%d,%d]\n", lin_row, lin_col);
             }
 
