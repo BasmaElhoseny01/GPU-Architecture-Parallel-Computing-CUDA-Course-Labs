@@ -1,8 +1,8 @@
 // Match Input Tile
 // All Threads Participate in the Loading of the Tile but some threads do not participate in the computation of the output tile
-// nvcc -o out_1  ./k1.cu
-// ./out_1 ./input ./output_k1 2 ./filters/avg_9_9.txt
-// nvprof out_2 ./testfile.txt ./out.txt
+// nvcc -o out_3  ./k3.cu
+// ./out_3 ./input ./output_k3 2 ./filters/avg_9_9.txt
+// nvprof out_3 ./testfile.txt ./out.txt
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,7 +24,9 @@
 
 #define IMAGE_CHANNELS 3
 
-#define OUTPUT_TILE_DIM 16
+#define OUTPUT_TILE_DIM 5
+// #define OUTPUT_TILE_DIM 10
+// #define OUTPUT_TILE_DIM 16
 // Declare Constant Memory
 // Max is 400 floating element :D
 __constant__ float filter_c[20 * 20];
@@ -176,88 +178,189 @@ __host__ void write_image(const char *folder_name, char *file_name, float *data,
     delete[] unsigned_char_data;
 }
 
-__global__ void input_tile_convolution(float *image, float *output_image, int width, int height, int batch_size, int filter_dim)
+__global__ void output_tile_convolution(float *image, float *output_image, int width, int height, int batch_size, int filter_dim, const int INPUT_TILE_DIM)
 {
-    int in_depth = blockDim.z * blockIdx.z + threadIdx.z;
-
-    // Output Tile
-    int out_row = blockIdx.y * OUTPUT_TILE_DIM + threadIdx.y;
-    int out_col = blockIdx.x * OUTPUT_TILE_DIM + threadIdx.x;
-
-    int tile_row = out_row - (filter_dim / 2);
-    int tile_col = out_col - (filter_dim / 2);
-
     // Store all elements needed to compute output in shared memory for the 3 channels
     extern __shared__ float sh_mem[];
 
-    // Load the Tile
-    if (tile_row < height && tile_col < width && tile_row >= 0 && tile_col >= 0)
+    //  No of Pixels Each Thread is responsible for ceil(input tile pixels/outputtile pixels)
+    // int no_pixles_per_thread_x = (INPUT_TILE_DIM + OUTPUT_TILE_DIM - 1) / (OUTPUT_TILE_DIM);
+    // int no_pixles_per_thread_y = (INPUT_TILE_DIM + OUTPUT_TILE_DIM - 1) / (OUTPUT_TILE_DIM);
+    int no_pixles_per_thread = (INPUT_TILE_DIM * INPUT_TILE_DIM + OUTPUT_TILE_DIM * OUTPUT_TILE_DIM - 1) / (OUTPUT_TILE_DIM * OUTPUT_TILE_DIM);
+
+    // printf("no_pixles_per_thread_x %d", no_pixles_per_thread_x); // 2
+    // printf("no_pixles_per_thread_y %d", no_pixles_per_thread_y); // 2
+    // printf("no_pixles_per_thread_y %d", no_pixles_per_thread_y * no_pixles_per_thread_x); // 3
+
+    int thread_id = threadIdx.y * blockDim.x + threadIdx.x; // Local To Block
+
+    // printf("thread_id %d\n",thread_id);  // 0-8 :D
+
+    // int start_index_x = blockIdx.x * OUTPUT_TILE_DIM - filter_dim / 2;
+    // int start_index_y = blockIdx.y * OUTPUT_TILE_DIM - filter_dim / 2;
+
+    // printf("start_index_x %d\n", start_index_x); //-1
+    // printf("start_index_y %d\n", start_index_y); //-1
+
+    // int load_counter = 0;
+    // printf("%d width\n", width);
+    // printf("%d filter_dim\n,", filter_dim);
+    // printf("%d width + filter_dim / 2\n", width + filter_dim / 2);
+    // printf("%d height\n",height );
+    // printf("%d height + filter_dim / 2\n",height + filter_dim / 2);
+
+    // int out_row_temp = blockIdx.y * OUTPUT_TILE_DIM + threadIdx.y;
+    // int out_col_temp = blockIdx.x * OUTPUT_TILE_DIM + threadIdx.x;
+
+    // for (int start_index_y = blockIdx.y * OUTPUT_TILE_DIM - (filter_dim / 2); start_index_y < (height + (filter_dim / 2)); start_index_y += OUTPUT_TILE_DIM)
+    // {
+    //     // if (blockIdx.x == 0 && blockIdx.y == 0 && thread_id == 0)
+    //     // {
+    //     //     printf("start_index_x %d\n", start_index_x); //-1
+    //     //     // printf("start_index_y %d\n", start_index_y); //-1
+    //     // }
+    //     for (int start_index_x = blockIdx.x * OUTPUT_TILE_DIM - (filter_dim / 2); start_index_x < (width + (filter_dim / 2)); start_index_x += OUTPUT_TILE_DIM)
+
+    //     {
+
+    //         // if (blockIdx.x == 0 && blockIdx.y == 0 && thread_id == 0)
+    //         // {
+    //         // printf("start_index_x %d,start_index_y %d\n", start_index_x,start_index_y); //-1
+    //         // printf("start_index_y %d\n", start_index_y); //-1
+    //         // }
+
+    //         // if (out_row_temp >= 0 && out_col_temp >= 0 && out_col_temp < width && out_row_temp < height)
+    //         // if (((start_index_x + threadIdx.x) >= 0) && ((start_index_y + threadIdx.y) >= 0))
+    //         // int x=start_index_x + (int)threadIdx.x;
+    //         if ((start_index_x + (int)threadIdx.x) >= 0 && (start_index_y + (int)threadIdx.y) >= 0)
+    //         // if ((start_index_x + threadIdx.x) >= 0 && (start_index_y + threadIdx.y) >= 0 && (start_index_x + threadIdx.x) < width && (start_index_y + threadIdx.y) < height)
+    //         {
+    //             for (int c = 0; c < IMAGE_CHANNELS; c++)
+    //             {
+    //                 if (blockIdx.x == 1 && blockIdx.y == 0)
+    //                 {
+    //                     printf("SHM [%d] IN[%d,%d] [%d] THID[%d] [%d,%d]\n", (threadIdx.y * blockDim.x + threadIdx.x) * IMAGE_CHANNELS + c + load_counter * (blockDim.x * blockDim.y * IMAGE_CHANNELS), (start_index_y + threadIdx.y), (start_index_x + threadIdx.x), ((start_index_y + threadIdx.y) * (width + filter_dim / 2 + 1) + (start_index_x + threadIdx.x)) * IMAGE_CHANNELS + c, thread_id, start_index_x, start_index_y);
+    //                 }
+
+    //                 if ((threadIdx.y * blockDim.x + threadIdx.x) * IMAGE_CHANNELS + c + load_counter * blockDim.x * blockDim.y * IMAGE_CHANNELS < INPUT_TILE_DIM * INPUT_TILE_DIM)
+    //                 {
+    //                     // For Threads at end has nothing else to load
+    //                     sh_mem[(threadIdx.y * blockDim.x + threadIdx.x) * IMAGE_CHANNELS + c + load_counter * (blockDim.x * blockDim.y * IMAGE_CHANNELS)] = image[((start_index_y + threadIdx.y) * (width + filter_dim / 2 + 1) + (start_index_x + threadIdx.x)) * IMAGE_CHANNELS + c];
+    //                 }
+    //             }
+    //         }
+    //         else
+    //         {
+    //             // Ghost Padding
+    //             for (int c = 0; c < IMAGE_CHANNELS; c++)
+    //             {
+    //                 if (blockIdx.x == 1 && blockIdx.y == 0)
+    //                 {
+    //                     printf("SHM [%d] IN[%d,%d] gh:%d THID[%d] [%d,%d]\n", (threadIdx.y * blockDim.x + threadIdx.x) * IMAGE_CHANNELS + c + load_counter * (blockDim.x * blockDim.y * IMAGE_CHANNELS), (start_index_y + threadIdx.y), (start_index_x + threadIdx.x), 0, thread_id, start_index_x, start_index_y);
+    //                 }
+
+    //                 if ((threadIdx.y * blockDim.x + threadIdx.x) * IMAGE_CHANNELS + c + load_counter * blockDim.x * blockDim.y * IMAGE_CHANNELS < INPUT_TILE_DIM * INPUT_TILE_DIM)
+    //                 {
+    //                     // For Threads at end has nothing else to load
+    //                     sh_mem[(threadIdx.y * blockDim.x + threadIdx.x) * IMAGE_CHANNELS + c + load_counter * (blockDim.x * blockDim.y * IMAGE_CHANNELS)] = 0.0;
+    //                 }
+    //             }
+    //         }
+
+    //         load_counter += 1;
+    //     }
+    // }
+    int start_index_x = blockIdx.x * OUTPUT_TILE_DIM - (filter_dim / 2);
+    int start_index_y = blockIdx.y * OUTPUT_TILE_DIM - (filter_dim / 2);
+    for (int i = 0; i < no_pixles_per_thread; i++)
     {
-        for (int c = 0; c < 3; c++)
+        // int i = 0;
+        // int col_step, row_step = 0;
+        int step = blockDim.x * blockDim.y;
+
+        // col_step = threads_per_block % INPUT_TILE_DIM;
+        // row_step = threads_per_block / INPUT_TILE_DIM;
+        int index_before_linearization = threadIdx.y * blockDim.x + threadIdx.x + i * step;
+        int lin_col = start_index_x + index_before_linearization % INPUT_TILE_DIM;
+        int lin_row = start_index_y + index_before_linearization / INPUT_TILE_DIM;
+
+        if (lin_row >= 0 && lin_col >= 0 && lin_col < width && lin_row < height)
         {
-            sh_mem[(threadIdx.y * blockDim.x + threadIdx.x) * IMAGE_CHANNELS + c] = image[(tile_row * width + tile_col) * IMAGE_CHANNELS + c];
+            if (blockIdx.x == 0 && blockIdx.y == 0)
+            {
+                printf("input[%d,%d]\n", lin_row, lin_col);
+            }
+
+            for (int c = 0; c < IMAGE_CHANNELS; c++)
+            {
+                int x = image[lin_row * blockDim.x + lin_col];
+                if ((threadIdx.y * blockDim.x + threadIdx.x) * IMAGE_CHANNELS + c + i * (blockDim.x * blockDim.y * IMAGE_CHANNELS) < INPUT_TILE_DIM * INPUT_TILE_DIM * 3)
+
+                    sh_mem[(threadIdx.y * blockDim.x + threadIdx.x) * IMAGE_CHANNELS + c + i * (blockDim.x * blockDim.y * IMAGE_CHANNELS)] = image[(lin_row * width + lin_col) * IMAGE_CHANNELS + c];
+            }
+            // image[start_index_y + threadIdx.y + start_index_x + threadIdx.x + i * (row_step * blockDim.x + col_step)];
+        }
+        else
+        {
+            if (blockIdx.x == 0 && blockIdx.y == 0)
+            {
+                printf("**input[%d,%d]\n", lin_row, lin_col);
+            }
+            // Gohost
+            for (int c = 0; c < IMAGE_CHANNELS; c++)
+            {
+                if ((threadIdx.y * blockDim.x + threadIdx.x) * IMAGE_CHANNELS + c + i * (blockDim.x * blockDim.y * IMAGE_CHANNELS) < INPUT_TILE_DIM * INPUT_TILE_DIM * 3)
+                {
+
+                    sh_mem[(threadIdx.y * blockDim.x + threadIdx.x) * IMAGE_CHANNELS + c + i * (blockDim.x * blockDim.y * IMAGE_CHANNELS)] = 0.0;
+                }
+            }
         }
     }
     __syncthreads();
 
-    // compute the output tile
+    // Each Thread is now Responsible for 1 output
+    // OutPut Image Indices
+    int out_row = blockIdx.y * OUTPUT_TILE_DIM + threadIdx.y;
+    int out_col = blockIdx.x * OUTPUT_TILE_DIM + threadIdx.x;
 
-    if (threadIdx.x < OUTPUT_TILE_DIM && threadIdx.y < OUTPUT_TILE_DIM && out_row < height && out_col < width)
+    if (out_row >= 0 && out_row < height && out_col >= 0 && out_col < width)
     {
-        float sum = 0;
 
-        for (int filterRow = 0; filterRow < filter_dim; filterRow++)
+        //     // printf("[%d,%d]   %d\n",out_row,out_col,out_row * width + out_col);
+
+        //     float sum = 0.0;
+        //     // Looping over mask :D
+        //     for (int filterRow = 0; filterRow < filter_dim; filterRow++)
+        //     {
+        //         for (int filterCol = 0; filterCol < filter_dim; filterCol++)
+        //         {
+        //             // For Every Channel
+        //             for (int c = 0; c < 3; c++)
+        //             {
+        //                 // Every Channel       :D shm[out_col+filterCol][out_row+filterRow]
+        //                 sum += filter_c[filterRow * filter_dim + filterCol] *
+        //                        sh_mem[(threadIdx.y + filterRow) * INPUT_TILE_DIM + (threadIdx.x + filterCol) * IMAGE_CHANNELS + c];
+        //                 //    sh_mem[((threadIdx.y + filterRow) * INPUT_TILE_DIM + (threadIdx.x + filterCol)) * IMAGE_CHANNELS + c];
+
+        //                 // sh_mem[(threadIdx.y + filterRow) * blockDim.x + (threadIdx.x + filterCol) * IMAGE_CHANNELS + c];
+        //             }
+        //         }
+        //     }
+
+        if ((((threadIdx.y) * OUTPUT_TILE_DIM + (threadIdx.x)) * IMAGE_CHANNELS) < INPUT_TILE_DIM * INPUT_TILE_DIM * 3)
         {
-            for (int filterCol = 0; filterCol < filter_dim; filterCol++)
-            {
 
-                for (int c = 0; c < 3; c++)
-                {
-                    // printf("Filter %f\n", filter_c[filterRow * filter_dim + filterCol]);
-                    // TODO : access shared mem sa7
-                    sum += filter_c[filterRow * filter_dim + filterCol] * // sh_mem[(threadIdx.y + filterRow) * blockDim.x * IMAGE_CHANNELS + (threadIdx.x + filterCol) * IMAGE_CHANNELS + c];
-                           sh_mem[((threadIdx.y + filterRow) * blockDim.x +
-                                   (threadIdx.x + filterCol)) *
-                                      IMAGE_CHANNELS +
-                                  c];
-
-                    // printf("Shem %f\n", sh_mem[(threadIdx.y + filterRow) * blockDim.x * IMAGE_CHANNELS + (threadIdx.x + filterCol) * IMAGE_CHANNELS + c]);
-                }
-                // printf("Filter %f\n", filter_c[filterRow * filter_dim + filterCol]);
-            }
+            output_image[out_row * width + out_col] = sh_mem[((threadIdx.y) * OUTPUT_TILE_DIM + (threadIdx.x)) * IMAGE_CHANNELS];
         }
-        output_image[out_row * width + out_col] = sum;
     }
-}
-
-__host__ void verify_convolution()
-{
-    //         // Verifcation
-    //         // Perform convolution
-    //         for (int i = 0; i < height; i++) {
-    //             for (int j = 0; j < height; j++) {
-    //                 float sum =0; // Initialize output at position (i,j) to zero
-    //                 // Apply filter
-    //                 for (int k = 0; k < FILTER_DIM; k++) {
-    //                     for (int l = 0; l < FILTER_DIM; l++) {
-    //                         int ni = i - FILTER_DIM / 2 + k;
-    //                         int nj = j - FILTER_DIM / 2 + l;
-    //                         for (int c = 0; c < IMAGE_CHANNELS; ++c) {
-    //                             // Check boundaries
-    //                             if (ni >= 0 && ni < height && nj >= 0 && nj < width) {
-    //                                 sum += image[ni][nj][c] * filter[k*FILTER_DIM + l];
-    //                             }
-    //                         }
-    //                     }
-    //                 }
-    //             printf("%d\n",sum);
-    //             printf("%d\n",output[i][j]);
-    //             assert(sum-output[i][j]<MAX_ERR);
-    //             }
-    //         }
-
-    //         // Process the file here
-    //         // Example: Load image using ent->d_name
+    // output_image[out_row * width + out_col] = sum;
+    // printf("Writing [%d] [%d,%d]\n",out_row * width+ out_col,out_row,out_col);
+    // }
+    // else
+    // {
+    //     // printf("%d\n", out_row);
+    // }
 }
 
 int main(int argc, char *argv[])
@@ -379,7 +482,7 @@ int main(int argc, char *argv[])
             // input tile
             int input_tile_dim = OUTPUT_TILE_DIM + filter_dim - 1;
 
-            dim3 threads_per_block(input_tile_dim, input_tile_dim, 1);
+            dim3 threads_per_block(OUTPUT_TILE_DIM, OUTPUT_TILE_DIM, 1);
 
             dim3 blocks_num(
                 (IMAGE_WIDTH + OUTPUT_TILE_DIM - 1) / OUTPUT_TILE_DIM,
@@ -387,7 +490,12 @@ int main(int argc, char *argv[])
                 // (batch_counter + threads_per_block.z - 1) / threads_per_block.z);
                 1);
 
-            input_tile_convolution<<<blocks_num, threads_per_block, input_tile_dim * input_tile_dim * 3 * sizeof(float)>>>(d_batched_images, d_output, IMAGE_WIDTH, IMAGE_HEIGHT, batch_counter, filter_dim);
+            // printf("%d\n", blocks_num.x);
+            // printf("%d\n", blocks_num.y);
+            // printf("%d\n", input_tile_dim);
+            // return 0;
+
+            output_tile_convolution<<<blocks_num, threads_per_block, input_tile_dim * input_tile_dim * 3 * sizeof(float)>>>(d_batched_images, d_output, IMAGE_WIDTH, IMAGE_HEIGHT, batch_counter, filter_dim, input_tile_dim);
 
             // If Error occurs in Kernel Execution Show it using cudaDeviceSynchronize,cudaGetLastError:D
             cudaDeviceSynchronize();
