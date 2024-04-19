@@ -184,102 +184,19 @@ __global__ void output_tile_convolution(float *image, float *output_image, int w
     extern __shared__ float sh_mem[];
 
     //  No of Pixels Each Thread is responsible for ceil(input tile pixels/outputtile pixels)
-    // int no_pixles_per_thread_x = (INPUT_TILE_DIM + OUTPUT_TILE_DIM - 1) / (OUTPUT_TILE_DIM);
-    // int no_pixles_per_thread_y = (INPUT_TILE_DIM + OUTPUT_TILE_DIM - 1) / (OUTPUT_TILE_DIM);
     int no_pixles_per_thread = (INPUT_TILE_DIM * INPUT_TILE_DIM + OUTPUT_TILE_DIM * OUTPUT_TILE_DIM - 1) / (OUTPUT_TILE_DIM * OUTPUT_TILE_DIM);
 
-    // printf("no_pixles_per_thread_x %d", no_pixles_per_thread_x); // 2
-    // printf("no_pixles_per_thread_y %d", no_pixles_per_thread_y); // 2
-    // printf("no_pixles_per_thread_y %d", no_pixles_per_thread_y * no_pixles_per_thread_x); // 3
 
     int thread_id = threadIdx.y * blockDim.x + threadIdx.x; // Local To Block
 
-    // printf("thread_id %d\n",thread_id);  // 0-8 :D
-
-    // int start_index_x = blockIdx.x * OUTPUT_TILE_DIM - filter_dim / 2;
-    // int start_index_y = blockIdx.y * OUTPUT_TILE_DIM - filter_dim / 2;
-
-    // printf("start_index_x %d\n", start_index_x); //-1
-    // printf("start_index_y %d\n", start_index_y); //-1
-
-    // int load_counter = 0;
-    // printf("%d width\n", width);
-    // printf("%d filter_dim\n,", filter_dim);
-    // printf("%d width + filter_dim / 2\n", width + filter_dim / 2);
-    // printf("%d height\n",height );
-    // printf("%d height + filter_dim / 2\n",height + filter_dim / 2);
-
-    // int out_row_temp = blockIdx.y * OUTPUT_TILE_DIM + threadIdx.y;
-    // int out_col_temp = blockIdx.x * OUTPUT_TILE_DIM + threadIdx.x;
-
-    // for (int start_index_y = blockIdx.y * OUTPUT_TILE_DIM - (filter_dim / 2); start_index_y < (height + (filter_dim / 2)); start_index_y += OUTPUT_TILE_DIM)
-    // {
-    //     // if (blockIdx.x == 0 && blockIdx.y == 0 && thread_id == 0)
-    //     // {
-    //     //     printf("start_index_x %d\n", start_index_x); //-1
-    //     //     // printf("start_index_y %d\n", start_index_y); //-1
-    //     // }
-    //     for (int start_index_x = blockIdx.x * OUTPUT_TILE_DIM - (filter_dim / 2); start_index_x < (width + (filter_dim / 2)); start_index_x += OUTPUT_TILE_DIM)
-
-    //     {
-
-    //         // if (blockIdx.x == 0 && blockIdx.y == 0 && thread_id == 0)
-    //         // {
-    //         // printf("start_index_x %d,start_index_y %d\n", start_index_x,start_index_y); //-1
-    //         // printf("start_index_y %d\n", start_index_y); //-1
-    //         // }
-
-    //         // if (out_row_temp >= 0 && out_col_temp >= 0 && out_col_temp < width && out_row_temp < height)
-    //         // if (((start_index_x + threadIdx.x) >= 0) && ((start_index_y + threadIdx.y) >= 0))
-    //         // int x=start_index_x + (int)threadIdx.x;
-    //         if ((start_index_x + (int)threadIdx.x) >= 0 && (start_index_y + (int)threadIdx.y) >= 0)
-    //         // if ((start_index_x + threadIdx.x) >= 0 && (start_index_y + threadIdx.y) >= 0 && (start_index_x + threadIdx.x) < width && (start_index_y + threadIdx.y) < height)
-    //         {
-    //             for (int c = 0; c < IMAGE_CHANNELS; c++)
-    //             {
-    //                 if (blockIdx.x == 1 && blockIdx.y == 0)
-    //                 {
-    //                     printf("SHM [%d] IN[%d,%d] [%d] THID[%d] [%d,%d]\n", (threadIdx.y * blockDim.x + threadIdx.x) * IMAGE_CHANNELS + c + load_counter * (blockDim.x * blockDim.y * IMAGE_CHANNELS), (start_index_y + threadIdx.y), (start_index_x + threadIdx.x), ((start_index_y + threadIdx.y) * (width + filter_dim / 2 + 1) + (start_index_x + threadIdx.x)) * IMAGE_CHANNELS + c, thread_id, start_index_x, start_index_y);
-    //                 }
-
-    //                 if ((threadIdx.y * blockDim.x + threadIdx.x) * IMAGE_CHANNELS + c + load_counter * blockDim.x * blockDim.y * IMAGE_CHANNELS < INPUT_TILE_DIM * INPUT_TILE_DIM)
-    //                 {
-    //                     // For Threads at end has nothing else to load
-    //                     sh_mem[(threadIdx.y * blockDim.x + threadIdx.x) * IMAGE_CHANNELS + c + load_counter * (blockDim.x * blockDim.y * IMAGE_CHANNELS)] = image[((start_index_y + threadIdx.y) * (width + filter_dim / 2 + 1) + (start_index_x + threadIdx.x)) * IMAGE_CHANNELS + c];
-    //                 }
-    //             }
-    //         }
-    //         else
-    //         {
-    //             // Ghost Padding
-    //             for (int c = 0; c < IMAGE_CHANNELS; c++)
-    //             {
-    //                 if (blockIdx.x == 1 && blockIdx.y == 0)
-    //                 {
-    //                     printf("SHM [%d] IN[%d,%d] gh:%d THID[%d] [%d,%d]\n", (threadIdx.y * blockDim.x + threadIdx.x) * IMAGE_CHANNELS + c + load_counter * (blockDim.x * blockDim.y * IMAGE_CHANNELS), (start_index_y + threadIdx.y), (start_index_x + threadIdx.x), 0, thread_id, start_index_x, start_index_y);
-    //                 }
-
-    //                 if ((threadIdx.y * blockDim.x + threadIdx.x) * IMAGE_CHANNELS + c + load_counter * blockDim.x * blockDim.y * IMAGE_CHANNELS < INPUT_TILE_DIM * INPUT_TILE_DIM)
-    //                 {
-    //                     // For Threads at end has nothing else to load
-    //                     sh_mem[(threadIdx.y * blockDim.x + threadIdx.x) * IMAGE_CHANNELS + c + load_counter * (blockDim.x * blockDim.y * IMAGE_CHANNELS)] = 0.0;
-    //                 }
-    //             }
-    //         }
-
-    //         load_counter += 1;
-    //     }
-    // }
+    // Start Index in both directions is from blick index in teh Grid with back steps by filterdim/2
     int start_index_x = blockIdx.x * OUTPUT_TILE_DIM - (filter_dim / 2);
     int start_index_y = blockIdx.y * OUTPUT_TILE_DIM - (filter_dim / 2);
+
     for (int i = 0; i < no_pixles_per_thread; i++)
     {
-        // int i = 0;
-        // int col_step, row_step = 0;
         int step = blockDim.x * blockDim.y;
 
-        // col_step = threads_per_block % INPUT_TILE_DIM;
-        // row_step = threads_per_block / INPUT_TILE_DIM;
         int index_before_linearization = threadIdx.y * blockDim.x + threadIdx.x + i * step;
         int lin_col = start_index_x + index_before_linearization % INPUT_TILE_DIM;
         int lin_row = start_index_y + index_before_linearization / INPUT_TILE_DIM;
@@ -298,7 +215,6 @@ __global__ void output_tile_convolution(float *image, float *output_image, int w
 
                     sh_mem[(threadIdx.y * blockDim.x + threadIdx.x) * IMAGE_CHANNELS + c + i * (blockDim.x * blockDim.y * IMAGE_CHANNELS)] = image[(lin_row * width + lin_col) * IMAGE_CHANNELS + c];
             }
-            // image[start_index_y + threadIdx.y + start_index_x + threadIdx.x + i * (row_step * blockDim.x + col_step)];
         }
         else
         {
