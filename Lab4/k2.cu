@@ -17,10 +17,10 @@
 #include <dirent.h>
 
 #define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
+#include "stb/stb_image.h"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "stb_image_write.h"
+#include "stb/stb_image_write.h"
 
 #define IMAGE_CHANNELS 3
 
@@ -176,130 +176,24 @@ __host__ void write_image(const char *folder_name, char *file_name, float *data,
     delete[] unsigned_char_data;
 }
 
-// Device Kernels
-__global__ void BatchConvolution(float *image, float *output_image, int width, int height, int batch_size, int filter_dim)
-{
-    int outRow = blockDim.y * blockIdx.y + threadIdx.y;
-    int outCol = blockDim.x * blockIdx.x + threadIdx.x;
-    int outDepth = blockDim.z * blockIdx.z + threadIdx.z;
-
-    // Boundary Cond
-    if (outRow < height && outCol < width)
-    {
-        float sum = 0;
-        // Looping over mask :D
-        for (int filterRow = 0; filterRow < filter_dim; filterRow++)
-        {
-            for (int filterCol = 0; filterCol < filter_dim; filterCol++)
-            {
-                int inRow = outRow - filter_dim / 2 + filterRow; // outRow - FilterRaduis + filterRow
-                int inCol = outCol - filter_dim / 2 + filterCol; // outCol - FilterRaduis + filterCol
-
-                // Apply boundary conditions (ghost cells)
-                inRow = max(0, min(inRow, height - 1));
-                inCol = max(0, min(inCol, width - 1));
-
-                // // Check if out of Bounday --> This is useless in case of padding
-                // if (inRow >= 0 && inRow < height && inCol >= 0 && inCol < width)
-                // {
-                for (int c = 0; c < 3; c++)
-                {
-                    // Every Channel
-                    sum += filter_c[filterRow * filter_dim + filterCol] * (float)image[(outDepth * height * width + inRow * width + inCol) * IMAGE_CHANNELS + c];
-                }
-                // }
-            }
-        }
-        output_image[(outDepth * height * width) + (outRow * width) + outCol] = sum;
-    }
-}
-
-__global__ void input_tile_convolution_gpt(float *image, float *output_image, int width, int height, int batch_size, int filter_dim)
-{
-    // Shared Memory
-    __shared__ float shared_image[16][16][4];
-
-    // Load the Tile
-    int inRow = blockDim.y * blockIdx.y + threadIdx.y;
-    int inCol = blockDim.x * blockIdx.x + threadIdx.x;
-    int inDepth = blockDim.z * blockIdx.z + threadIdx.z;
-
-    // Load the Tile
-    if (inRow < height && inCol < width)
-    {
-        for (int c = 0; c < 3; c++)
-        {
-            shared_image[threadIdx.y][threadIdx.x][threadIdx.z] = image[(inDepth * height * width + inRow * width + inCol) * IMAGE_CHANNELS + c];
-        }
-    }
-
-    __syncthreads();
-
-    // Convolution
-    int outRow = inRow;
-    int outCol = inCol;
-    int outDepth = inDepth;
-
-    // Boundary Cond
-    if (outRow < height && outCol < width)
-    {
-        float sum = 0;
-        // Looping over mask :D
-        for (int filterRow = 0; filterRow < filter_dim; filterRow++)
-        {
-            for (int filterCol = 0; filterCol < filter_dim; filterCol++)
-            {
-                int inRow = outRow - filter_dim / 2 + filterRow; // outRow - FilterRaduis + filterRow
-                int inCol = outCol - filter_dim / 2 + filterCol; // outCol - FilterRaduis + filterCol
-
-                // Apply boundary conditions (ghost cells)
-                inRow = max(0, min(inRow, height - 1));
-                inCol = max(0, min(inCol, width - 1));
-
-                // // Check if out of Bounday --> This is useless in case of padding
-                // if (inRow >= 0 && inRow < height && inCol >= 0 && inCol < width)
-                // {
-                for (int c = 0; c < 3; c++)
-                {
-                    // Every Channel
-                    sum += filter_c[filterRow * filter_dim + filterCol] * shared_image[inRow % 16][inCol % 16][c];
-                }
-                // }
-            }
-        }
-        output_image[(outDepth * height * width) + (outRow * width) + outCol] = sum;
-    }
-}
-
 __global__ void input_tile_convolution(float *image, float *output_image, int width, int height, int batch_size, int filter_dim)
 {
-    // Input Image Indices
-    int in_row = blockDim.y * blockIdx.y + threadIdx.y;
-    int in_col = blockDim.x * blockIdx.x + threadIdx.x;
 
     // OutPut Image Indices
     // 6*0+0-1 =>-1
     int out_row = OUTPUT_TILE_DIM * blockIdx.y + threadIdx.y - (filter_dim / 2);
     int out_col = OUTPUT_TILE_DIM * blockIdx.x + threadIdx.x - (filter_dim / 2);
 
+    int batch_index = blockIdx.z; // This is the new batch index
     // Store all elements needed to compute output in shared memory for the 3 channels
     extern __shared__ float sh_mem[];
 
-    // if (in_row<height &&in_col<width){
-    // if ((OUTPUT_TILE_DIM * blockIdx.y + threadIdx.y)<(height+filter_dim / 2) &&(OUTPUT_TILE_DIM * blockIdx.x + threadIdx.x)<(width){
     if (out_row >= 0 && out_row < height && out_col >= 0 && out_col < width)
     {
-        // out_row=-1 won't load although its input is 0 --> This is the case of the border threads :D Padd to be added
-        //  This Row and Col are in the input image boundary
-        // Load the Tile
-        // sh_mem[threadIdx.y][threadIdx.x] = image[in_row][in_col];  --> For Every Channel
 
         for (int c = 0; c < 3; c++)
         {
-            // sh_mem[(threadIdx.y * blockDim.x + threadIdx.x) * IMAGE_CHANNELS + c] = image[((out_row+filter_dim / 2) * width + (out_col+filter_dim / 2)) * IMAGE_CHANNELS + c];
-            // sh_mem[(threadIdx.y * blockDim.x + threadIdx.x) * IMAGE_CHANNELS + c] = image[((out_row) * width + (out_col)) * IMAGE_CHANNELS + c];
-            sh_mem[(threadIdx.y * blockDim.x + threadIdx.x) * IMAGE_CHANNELS + c] = image[((out_row)*width + (out_col)) * IMAGE_CHANNELS + c];
-            // sh_mem[(threadIdx.y * blockDim.x + threadIdx.x) * IMAGE_CHANNELS + c] = image[(in_row * width + in_col) * IMAGE_CHANNELS + c];
+            sh_mem[(threadIdx.y * blockDim.x + threadIdx.x) * IMAGE_CHANNELS + c] = image[(batch_index * width * height + out_row * width + out_col) * IMAGE_CHANNELS + c];
         }
     }
     else
@@ -307,16 +201,11 @@ __global__ void input_tile_convolution(float *image, float *output_image, int wi
         // Padding
         for (int c = 0; c < 3; c++)
         {
-            // sh_mem[(threadIdx.y * blockDim.x + threadIdx.x) * IMAGE_CHANNELS + c] = 0.0;
             sh_mem[(threadIdx.y * blockDim.x + threadIdx.x) * IMAGE_CHANNELS + c] = 0.0;
         }
     }
     // Wait for all threads to finish loading the tile
     __syncthreads();
-
-    // if (out_row>=0 && out_row<height && out_col>=0 && out_col<width){
-    // output_image[out_row*width + out_col]=sh_mem[(threadIdx.y * blockDim.x + threadIdx.x) * IMAGE_CHANNELS + 0];
-    // }
 
     // The inner Thread of the Blocks are to be active and border threads are to be inactive :D
     // Case filter raduis is 1 we will get border col -1 and OUTPUT_TILE_DIM --> This to be idel threads
@@ -351,139 +240,13 @@ __global__ void input_tile_convolution(float *image, float *output_image, int wi
                     for (int c = 0; c < 3; c++)
                     {
                         // Every Channel
-                        // sum += filter_c[filterRow * filter_dim + filterCol] * sh_mem[out_tile_col-filter_raduis][out_tile_row-filter_raduis]
                         sum += filter_c[filterRow * filter_dim + filterCol] * sh_mem[((out_tile_row + filterRow) * blockDim.x + (out_tile_col + filterCol)) * IMAGE_CHANNELS + c];
                     }
                 }
             }
-            // output_image[out_row][out_col] = ..;
-            output_image[out_row * width + out_col] = sum;
-        }
-        // Else Border Threads in the block (=input title) so idle :D
-        if (out_row * width + out_col == 0)
-        {
-            printf("Thread Id: %d %d %d\n", threadIdx.x, threadIdx.y, threadIdx.z);
-            printf("Block Id: %d %d %d\n", blockIdx.x, blockIdx.y, blockIdx.z);
-            printf("Out Row: %d Out Col: %d\n", out_row, out_col);
-            printf("In Row: %d In Col: %d\n", in_row, in_col);
-
-            printf("sum %f\n", output_image[out_row * width + out_col]);
-            // output_image[out_row*width + out_col]=0.0;
-        }
-        if (in_row * width + in_col == 0)
-        {
-            printf("Thread Id: %d %d %d\n", threadIdx.x, threadIdx.y, threadIdx.z);
-            printf("Block Id: %d %d %d\n", blockIdx.x, blockIdx.y, blockIdx.z);
-            printf("**Out Row: %d Out Col: %d\n", out_row, out_col);
-            printf("In Row: %d In Col: %d\n", in_row, in_col);
-
-            printf("sum %f\n", output_image[in_row * width + in_col]);
+            output_image[batch_index * height * width + out_row * width + out_col] = sum;
         }
     }
-}
-
-// __global__ void input_tile_convolution(float *image, float *output_image, int width, int height, int batch_size, int filter_dim)
-// {
-
-//     // Input Tile
-//     // int in_row = blockDim.y * blockIdx.y + threadIdx.y - (filter_dim / 2);
-//     // int in_col = blockDim.x * blockIdx.x + threadIdx.x - (filter_dim / 2);
-//     int in_row = OUTPUT_TILE_DIM * blockIdx.y + threadIdx.y - (filter_dim / 2);
-//     int in_col = OUTPUT_TILE_DIM * blockIdx.x + threadIdx.x - (filter_dim / 2);
-//     int in_depth = blockDim.z * blockIdx.z + threadIdx.z;
-
-//     // Output Tile
-//     int out_row = blockIdx.y * OUTPUT_TILE_DIM + threadIdx.y;
-//     int out_col = blockIdx.x * OUTPUT_TILE_DIM + threadIdx.x;
-
-//     // Store all elements needed to compute output in shared memory for the 3 channels
-//     extern __shared__ float sh_mem[];
-
-//     // Load the Tile
-//     if (in_row < height && in_col < width && in_row >= 0 && in_col >= 0)
-
-//     {
-//         for (int c = 0; c < 3; c++)
-//         {
-//             sh_mem[(threadIdx.y * blockDim.x + threadIdx.x) * IMAGE_CHANNELS + c] = image[(in_row * width + in_col) * IMAGE_CHANNELS + c];
-//         }
-//     }
-//     else{
-//         // Add Zeros For Padding :D
-//         for (int c = 0; c < 3; c++)
-//         {
-//             sh_mem[(threadIdx.y * blockDim.x + threadIdx.x) * IMAGE_CHANNELS + c] = 0;
-//         }
-//     }
-
-//     // else
-//     // {
-//     //     sh_mem[(threadIdx.y * blockDim.x + threadIdx.x) * IMAGE_CHANNELS] = 0;
-//     // }
-//     __syncthreads();
-//     /////////////////////////////////////////////////
-
-//     // if (in_row < height && in_col < width && in_row >= 0 && in_col >= 0)
-//     if (threadIdx.x < OUTPUT_TILE_DIM && threadIdx.y < OUTPUT_TILE_DIM && out_row < height && out_col < width)
-//     {
-
-//         float sum = 0;
-
-//         for (int filterRow = 0; filterRow < filter_dim; filterRow++)
-//         {
-//             for (int filterCol = 0; filterCol < filter_dim; filterCol++)
-//             {
-//                 // apply boundary conditions (ghost cells)
-//                 int sh_row = max(0, min(threadIdx.y + filterRow, height - 1));
-//                 int sh_col = max(0, min(threadIdx.x + filterCol, width - 1));
-
-//                 // int sh_row = threadIdx.y + filterRow;
-//                 // int sh_col = threadIdx.x + filterCol;
-//                 // Check if out of Bounday --> This is useless in case of padding
-
-//                 for (int c = 0; c < 3; c++)
-//                 {
-//                     sum += filter_c[filterRow * filter_dim + filterCol] *
-//                            sh_mem[((sh_row)*blockDim.x +
-//                                    (sh_col)) *
-//                                       IMAGE_CHANNELS +
-//                                   c];
-//                 }
-//             }
-//         }
-//         output_image[out_row * width + out_col] = sum;
-//         // }
-//     }
-// }
-
-__host__ void verify_convolution()
-{
-    //         // Verifcation
-    //         // Perform convolution
-    //         for (int i = 0; i < height; i++) {
-    //             for (int j = 0; j < height; j++) {
-    //                 float sum =0; // Initialize output at position (i,j) to zero
-    //                 // Apply filter
-    //                 for (int k = 0; k < FILTER_DIM; k++) {
-    //                     for (int l = 0; l < FILTER_DIM; l++) {
-    //                         int ni = i - FILTER_DIM / 2 + k;
-    //                         int nj = j - FILTER_DIM / 2 + l;
-    //                         for (int c = 0; c < IMAGE_CHANNELS; ++c) {
-    //                             // Check boundaries
-    //                             if (ni >= 0 && ni < height && nj >= 0 && nj < width) {
-    //                                 sum += image[ni][nj][c] * filter[k*FILTER_DIM + l];
-    //                             }
-    //                         }
-    //                     }
-    //                 }
-    //             printf("%d\n",sum);
-    //             printf("%d\n",output[i][j]);
-    //             assert(sum-output[i][j]<MAX_ERR);
-    //             }
-    //         }
-
-    //         // Process the file here
-    //         // Example: Load image using ent->d_name
 }
 
 int main(int argc, char *argv[])
@@ -591,17 +354,6 @@ int main(int argc, char *argv[])
             float *d_output; // Device pointer for the 2D array
             cudaMalloc((void **)&d_output, sizeof(float) * IMAGE_WIDTH * IMAGE_HEIGHT * batch_counter);
 
-            // Convolution
-            // Block Size
-            // dim3 threadsPerBlock(16, 16, 4);
-            // // Grid Size
-            // dim3 numBlocks((IMAGE_WIDTH + threadsPerBlock.x - 1) / threadsPerBlock.x,
-            //    (IMAGE_HEIGHT + threadsPerBlock.y - 1) / threadsPerBlock.y,
-            //    (batch_counter + threadsPerBlock.z - 1) / threadsPerBlock.z);
-
-            // // Call the kernel
-            // BatchConvolution<<<numBlocks, threadsPerBlock>>>(d_batched_images, d_output, IMAGE_WIDTH, IMAGE_HEIGHT, batch_counter, filter_dim);
-
             // input tile
             int input_tile_dim = OUTPUT_TILE_DIM + filter_dim - 1;
 
@@ -610,8 +362,7 @@ int main(int argc, char *argv[])
             dim3 blocks_num(
                 (IMAGE_WIDTH + OUTPUT_TILE_DIM - 1) / OUTPUT_TILE_DIM,
                 (IMAGE_HEIGHT + OUTPUT_TILE_DIM - 1) / OUTPUT_TILE_DIM,
-                // (batch_counter + threads_per_block.z - 1) / threads_per_block.z);
-                1);
+                batch_counter);
 
             input_tile_convolution<<<blocks_num, threads_per_block, input_tile_dim * input_tile_dim * 3 * sizeof(float)>>>(d_batched_images, d_output, IMAGE_WIDTH, IMAGE_HEIGHT, batch_counter, filter_dim);
 
