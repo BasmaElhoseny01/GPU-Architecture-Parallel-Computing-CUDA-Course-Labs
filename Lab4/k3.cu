@@ -178,14 +178,13 @@ __host__ void write_image(const char *folder_name, char *file_name, float *data,
     delete[] unsigned_char_data;
 }
 
-__global__ void output_tile_convolution(float *image, float *output_image, int width, int height, int batch_size, int filter_dim, const int INPUT_TILE_DIM)
+__global__ void output_tile_convolution_y(float *image, float *output_image, int width, int height, int batch_size, int filter_dim, const int INPUT_TILE_DIM)
 {
     // Store all elements needed to compute output in shared memory for the 3 channels
     extern __shared__ float sh_mem[];
 
     //  No of Pixels Each Thread is responsible for ceil(input tile pixels/outputtile pixels)
     int no_pixles_per_thread = (INPUT_TILE_DIM * INPUT_TILE_DIM + OUTPUT_TILE_DIM * OUTPUT_TILE_DIM - 1) / (OUTPUT_TILE_DIM * OUTPUT_TILE_DIM);
-
 
     int thread_id = threadIdx.y * blockDim.x + threadIdx.x; // Local To Block
 
@@ -197,7 +196,9 @@ __global__ void output_tile_convolution(float *image, float *output_image, int w
     {
         int step = blockDim.x * blockDim.y;
 
-        int index_before_linearization = threadIdx.y * blockDim.x + threadIdx.x + i * step;
+        // int index_before_linearization = threadIdx.y * blockDim.x + threadIdx.x + i * step;
+        int index_before_linearization = thread_id + i * step;
+
         int lin_col = start_index_x + index_before_linearization % INPUT_TILE_DIM;
         int lin_row = start_index_y + index_before_linearization / INPUT_TILE_DIM;
 
@@ -210,7 +211,7 @@ __global__ void output_tile_convolution(float *image, float *output_image, int w
 
             for (int c = 0; c < IMAGE_CHANNELS; c++)
             {
-                int x = image[lin_row * blockDim.x + lin_col];
+                // int x = image[lin_row * blockDim.x + lin_col];
                 if ((threadIdx.y * blockDim.x + threadIdx.x) * IMAGE_CHANNELS + c + i * (blockDim.x * blockDim.y * IMAGE_CHANNELS) < INPUT_TILE_DIM * INPUT_TILE_DIM * 3)
 
                     sh_mem[(threadIdx.y * blockDim.x + threadIdx.x) * IMAGE_CHANNELS + c + i * (blockDim.x * blockDim.y * IMAGE_CHANNELS)] = image[(lin_row * width + lin_col) * IMAGE_CHANNELS + c];
@@ -233,6 +234,94 @@ __global__ void output_tile_convolution(float *image, float *output_image, int w
             }
         }
     }
+    __syncthreads();
+
+    // Each Thread is now Responsible for 1 output
+    // OutPut Image Indices
+    int out_row = blockIdx.y * OUTPUT_TILE_DIM + threadIdx.y;
+    int out_col = blockIdx.x * OUTPUT_TILE_DIM + threadIdx.x;
+
+    if (out_row >= 0 && out_row < height && out_col >= 0 && out_col < width)
+    {
+
+        //     // printf("[%d,%d]   %d\n",out_row,out_col,out_row * width + out_col);
+
+        //     float sum = 0.0;
+        //     // Looping over mask :D
+        //     for (int filterRow = 0; filterRow < filter_dim; filterRow++)
+        //     {
+        //         for (int filterCol = 0; filterCol < filter_dim; filterCol++)
+        //         {
+        //             // For Every Channel
+        //             for (int c = 0; c < 3; c++)
+        //             {
+        //                 // Every Channel       :D shm[out_col+filterCol][out_row+filterRow]
+        //                 sum += filter_c[filterRow * filter_dim + filterCol] *
+        //                        sh_mem[(threadIdx.y + filterRow) * INPUT_TILE_DIM + (threadIdx.x + filterCol) * IMAGE_CHANNELS + c];
+        //                 //    sh_mem[((threadIdx.y + filterRow) * INPUT_TILE_DIM + (threadIdx.x + filterCol)) * IMAGE_CHANNELS + c];
+
+        //                 // sh_mem[(threadIdx.y + filterRow) * blockDim.x + (threadIdx.x + filterCol) * IMAGE_CHANNELS + c];
+        //             }
+        //         }
+        //     }
+
+        if ((((threadIdx.y) * OUTPUT_TILE_DIM + (threadIdx.x)) * IMAGE_CHANNELS) < INPUT_TILE_DIM * INPUT_TILE_DIM * 3)
+        {
+
+            output_image[out_row * width + out_col] = sh_mem[((threadIdx.y) * OUTPUT_TILE_DIM + (threadIdx.x)) * IMAGE_CHANNELS];
+        }
+    }
+    // output_image[out_row * width + out_col] = sum;
+    // printf("Writing [%d] [%d,%d]\n",out_row * width+ out_col,out_row,out_col);
+    // }
+    // else
+    // {
+    //     // printf("%d\n", out_row);
+    // }
+}
+
+__global__ void output_tile_convolution(float *image, float *output_image, int width, int height, int batch_size, int filter_dim, const int INPUT_TILE_DIM)
+{
+    // Store all elements needed to compute output in shared memory for the 3 channels
+    extern __shared__ float sh_mem[];
+
+    // Number of Pixels Each Thread is responsible for ceil(input tile pixels/output tile pixels)
+    int no_pixels_per_thread = (INPUT_TILE_DIM * INPUT_TILE_DIM + OUTPUT_TILE_DIM * OUTPUT_TILE_DIM - 1) / (OUTPUT_TILE_DIM * OUTPUT_TILE_DIM);
+
+    int thread_id = threadIdx.y * blockDim.x + threadIdx.x; // Local To Block
+
+    // Start Index in both directions is from block index in the Grid with back steps by filterdim/2
+    int start_index_x = blockIdx.x * OUTPUT_TILE_DIM - (filter_dim / 2);
+    int start_index_y = blockIdx.y * OUTPUT_TILE_DIM - (filter_dim / 2);
+
+    for (int i = 0; i < no_pixels_per_thread; i++)
+    {
+        int step = blockDim.x * blockDim.y;
+
+        int index_before_linearization = thread_id + i * step;
+        int lin_col = start_index_x + index_before_linearization % OUTPUT_TILE_DIM;
+        int lin_row = start_index_y + index_before_linearization / OUTPUT_TILE_DIM;
+
+        if (lin_row >= 0 && lin_col >= 0 && lin_col < width && lin_row < height)
+        {
+            for (int c = 0; c < IMAGE_CHANNELS; c++)
+            {
+                int image_index = (lin_row * width + lin_col) * IMAGE_CHANNELS + c;
+                int shared_index = thread_id * IMAGE_CHANNELS + c + i * (blockDim.x * blockDim.y * IMAGE_CHANNELS);
+                sh_mem[shared_index] = image[image_index];
+            }
+        }
+        else
+        {
+            // Out of bounds handling
+            for (int c = 0; c < IMAGE_CHANNELS; c++)
+            {
+                int shared_index = thread_id * IMAGE_CHANNELS + c + i * (blockDim.x * blockDim.y * IMAGE_CHANNELS);
+                sh_mem[shared_index] = 0.0; // Assign some default value or handle differently based on your requirement
+            }
+        }
+    }
+
     __syncthreads();
 
     // Each Thread is now Responsible for 1 output
