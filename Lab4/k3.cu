@@ -332,26 +332,33 @@ __global__ void output_tile_convolution(float *image, float *output_image, int w
     if (out_row >= 0 && out_row < height && out_col >= 0 && out_col < width)
     {
 
+
         //     // printf("[%d,%d]   %d\n",out_row,out_col,out_row * width + out_col);
 
-        //     float sum = 0.0;
-        //     // Looping over mask :D
-        //     for (int filterRow = 0; filterRow < filter_dim; filterRow++)
-        //     {
-        //         for (int filterCol = 0; filterCol < filter_dim; filterCol++)
-        //         {
-        //             // For Every Channel
-        //             for (int c = 0; c < 3; c++)
-        //             {
-        //                 // Every Channel       :D shm[out_col+filterCol][out_row+filterRow]
-        //                 sum += filter_c[filterRow * filter_dim + filterCol] *
-        //                        sh_mem[(threadIdx.y + filterRow) * INPUT_TILE_DIM + (threadIdx.x + filterCol) * IMAGE_CHANNELS + c];
-        //                 //    sh_mem[((threadIdx.y + filterRow) * INPUT_TILE_DIM + (threadIdx.x + filterCol)) * IMAGE_CHANNELS + c];
+        float sum = 0.0;
+        // Looping over mask :D
+        for (int filterRow = 0; filterRow < filter_dim; filterRow++)
+        {
+            for (int filterCol = 0; filterCol < filter_dim; filterCol++)
+            {
+                // For Every Channel
+                for (int c = 0; c < 3; c++)
+                {
+                    // Every Channel
+                    sum += filter_c[filterRow * filter_dim + filterCol] * sh_mem[((out_row + filterRow) * blockDim.x + (out_col + filterCol)) * IMAGE_CHANNELS + c];
+                }
+                // For Every Channel
+                // for (int c = 0; c < 3; c++)
+                //{
+                //                 // Every Channel       :D shm[out_col+filterCol][out_row+filterRow]
+                //                 sum += filter_c[filterRow * filter_dim + filterCol] *
+                //                        sh_mem[(threadIdx.y + filterRow) * INPUT_TILE_DIM + (threadIdx.x + filterCol) * IMAGE_CHANNELS + c];
+                //                 //    sh_mem[((threadIdx.y + filterRow) * INPUT_TILE_DIM + (threadIdx.x + filterCol)) * IMAGE_CHANNELS + c];
 
-        //                 // sh_mem[(threadIdx.y + filterRow) * blockDim.x + (threadIdx.x + filterCol) * IMAGE_CHANNELS + c];
-        //             }
-        //         }
-        //     }
+                //                 // sh_mem[(threadIdx.y + filterRow) * blockDim.x + (threadIdx.x + filterCol) * IMAGE_CHANNELS + c];
+                //}
+            }
+        }
 
         if ((((threadIdx.y) * OUTPUT_TILE_DIM + (threadIdx.x)) * IMAGE_CHANNELS) < INPUT_TILE_DIM * INPUT_TILE_DIM * 3)
         {
