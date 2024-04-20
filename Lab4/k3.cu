@@ -24,12 +24,12 @@
 
 #define IMAGE_CHANNELS 3
 
-// #define OUTPUT_TILE_DIM 32
+//#define OUTPUT_TILE_DIM 32
 #define OUTPUT_TILE_DIM 16
-// #define OUTPUT_TILE_DIM 10
-// #define OUTPUT_TILE_DIM 16
-// Declare Constant Memory
-// Max is 400 floating element :D
+//  #define OUTPUT_TILE_DIM 10
+//  #define OUTPUT_TILE_DIM 16
+//  Declare Constant Memory
+//  Max is 400 floating element :D
 __constant__ float filter_c[20 * 20];
 
 // Host Functions
@@ -338,7 +338,7 @@ __global__ void output_tile_convolution(float *image, float *output_image, int w
 
                         // printf("sh[%d],image[%d]\n", shared_index, -1);
                     }
-                    sh_mem[shared_index] = 1.0; // Assign some default value or handle differently based on your requirement
+                    sh_mem[shared_index] = 0.0; // Assign some default value or handle differently based on your requirement
                 }
             }
         }
@@ -350,7 +350,7 @@ __global__ void output_tile_convolution(float *image, float *output_image, int w
     // OutPut Image Indices
     int out_row = blockIdx.y * OUTPUT_TILE_DIM + threadIdx.y;
     int out_col = blockIdx.x * OUTPUT_TILE_DIM + threadIdx.x;
-    //printf("[%d,%d]\n",out_row,out_col);
+    // printf("[%d,%d]\n",out_row,out_col);
 
     if (out_row >= 0 && out_row < height && out_col >= 0 && out_col < width)
     {
@@ -376,7 +376,7 @@ __global__ void output_tile_convolution(float *image, float *output_image, int w
                         if (blockIdx.x == 1 && blockIdx.y == 0)
                         {
 
-                            //printf("sh[%d]\n", (sh_row * blockDim.x + sh_col) * IMAGE_CHANNELS + c);
+                            // printf("sh[%d]\n", (sh_row * blockDim.x + sh_col) * IMAGE_CHANNELS + c);
                         }
                         // Every Channel
                         sum += filter_c[filterRow * filter_dim + filterCol] * sh_mem[(sh_row * blockDim.x + sh_col) * IMAGE_CHANNELS + c];
