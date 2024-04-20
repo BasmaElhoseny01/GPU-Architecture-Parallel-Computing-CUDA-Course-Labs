@@ -332,7 +332,6 @@ __global__ void output_tile_convolution(float *image, float *output_image, int w
     if (out_row >= 0 && out_row < height && out_col >= 0 && out_col < width)
     {
 
-
         //     // printf("[%d,%d]   %d\n",out_row,out_col,out_row * width + out_col);
 
         float sum = 0.0;
@@ -362,6 +361,7 @@ __global__ void output_tile_convolution(float *image, float *output_image, int w
 
         if ((((threadIdx.y) * OUTPUT_TILE_DIM + (threadIdx.x)) * IMAGE_CHANNELS) < INPUT_TILE_DIM * INPUT_TILE_DIM * 3)
         {
+            //output_image[out_row * width + out_col] = sum;
 
             output_image[out_row * width + out_col] = sh_mem[((threadIdx.y) * OUTPUT_TILE_DIM + (threadIdx.x)) * IMAGE_CHANNELS];
         }
