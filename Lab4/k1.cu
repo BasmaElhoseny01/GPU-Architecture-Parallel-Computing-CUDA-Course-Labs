@@ -212,36 +212,6 @@ __global__ void BatchConvolution(float *image, float *output_image, int width, i
     }
 }
 
-__host__ void verify_convolution()
-{
-    //         // Verifcation
-    //         // Perform convolution
-    //         for (int i = 0; i < height; i++) {
-    //             for (int j = 0; j < height; j++) {
-    //                 float sum =0; // Initialize output at position (i,j) to zero
-    //                 // Apply filter
-    //                 for (int k = 0; k < FILTER_DIM; k++) {
-    //                     for (int l = 0; l < FILTER_DIM; l++) {
-    //                         int ni = i - FILTER_DIM / 2 + k;
-    //                         int nj = j - FILTER_DIM / 2 + l;
-    //                         for (int c = 0; c < IMAGE_CHANNELS; ++c) {
-    //                             // Check boundaries
-    //                             if (ni >= 0 && ni < height && nj >= 0 && nj < width) {
-    //                                 sum += image[ni][nj][c] * filter[k*FILTER_DIM + l];
-    //                             }
-    //                         }
-    //                     }
-    //                 }
-    //             printf("%d\n",sum);
-    //             printf("%d\n",output[i][j]);
-    //             assert(sum-output[i][j]<MAX_ERR);
-    //             }
-    //         }
-
-    //         // Process the file here
-    //         // Example: Load image using ent->d_name
-}
-
 int main(int argc, char *argv[])
 {
 
