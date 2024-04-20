@@ -15,10 +15,10 @@
 #include <dirent.h>
 
 #define STB_IMAGE_IMPLEMENTATION
-#include "stb/stb_image.h"
+#include "stb_image.h"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "stb/stb_image_write.h"
+#include "stb_image_write.h"
 
 #define IMAGE_CHANNELS 3
 
@@ -193,18 +193,17 @@ __global__ void BatchConvolution(float *image, float *output_image, int width, i
                 int inRow = outRow - filter_dim / 2 + filterRow; // outRow - FilterRaduis + filterRow
                 int inCol = outCol - filter_dim / 2 + filterCol; // outCol - FilterRaduis + filterCol
 
-                // Apply boundary conditions (ghost cells)
-                inRow = max(0, min(inRow, height - 1));
-                inCol = max(0, min(inCol, width - 1));
-
-                // // Check if out of Bounday --> This is useless in case of padding
-                // if (inRow >= 0 && inRow < height && inCol >= 0 && inCol < width)
-                // {
-                for (int c = 0; c < 3; c++)
+                // Check if out of Bounday --> This is useless in case of padding
+                if (inRow >= 0 && inRow < height && inCol >= 0 && inCol < width)
                 {
-                    // Every Channel
-                    sum += filter_c[filterRow * filter_dim + filterCol] * (float)image[(outDepth * height * width + inRow * width + inCol) * IMAGE_CHANNELS + c];
+                    for (int c = 0; c < 3; c++)
+                        // Every Channel
+                        sum += filter_c[filterRow * filter_dim + filterCol] * (float)image[(outDepth * height * width + inRow * width + inCol) * IMAGE_CHANNELS + c];
                 }
+                // else
+                //{
+                //     // ghost Cells
+                //     sum += 0.0;
                 // }
             }
         }
@@ -319,7 +318,8 @@ int main(int argc, char *argv[])
 
             // Convolution
             // Block Size
-            dim3 threadsPerBlock(16, 16, 4);
+            dim3 threadsPerBlock(16, 16, 1);
+            
             // Grid Size
             dim3 numBlocks((IMAGE_WIDTH + threadsPerBlock.x - 1) / threadsPerBlock.x,
                            (IMAGE_HEIGHT + threadsPerBlock.y - 1) / threadsPerBlock.y,
@@ -366,17 +366,17 @@ int main(int argc, char *argv[])
             }
         }
 
-        // // Free Host Memory
-        // // Free memory allocated for the filter in host memory
-        // free(filter);
-        // // Free memory allocated for the filter in host memory
-        // free(image_filenames);
+        // Free Host Memory
+        // Free memory allocated for the filter in host memory
+        free(filter);
+        // Free memory allocated for the filter in host memory
+        free(image_filenames);
 
-        // // Free Device Memory
-        // // Free memory allocated for the filter in constant memory
-        // cudaFree(filter_c);
-        // // Free memory allocated for the batched images in device shared memory
-        // cudaFree(d_batched_images);
+        // Free Device Memory
+        // Free memory allocated for the filter in constant memory
+        cudaFree(filter_c);
+        // Free memory allocated for the batched images in device shared memory
+        cudaFree(d_batched_images);
 
         // Close the diresctory
         closedir(dir);
