@@ -25,11 +25,11 @@
 #define IMAGE_CHANNELS 3
 
 // #define OUTPUT_TILE_DIM 32
-#define OUTPUT_TILE_DIM 32
-// #define OUTPUT_TILE_DIM 10
-// #define OUTPUT_TILE_DIM 16
-// Declare Constant Memory
-// Max is 400 floating element :D
+#define OUTPUT_TILE_DIM 16
+//  #define OUTPUT_TILE_DIM 10
+//  #define OUTPUT_TILE_DIM 16
+//  Declare Constant Memory
+//  Max is 400 floating element :D
 __constant__ float filter_c[20 * 20];
 
 // Host Functions
@@ -338,7 +338,7 @@ __global__ void output_tile_convolution(float *image, float *output_image, int w
 
                         // printf("sh[%d],image[%d]\n", shared_index, -1);
                     }
-                    sh_mem[shared_index] = 1.0; // Assign some default value or handle differently based on your requirement
+                    sh_mem[shared_index] = 0.0; // Assign some default value or handle differently based on your requirement
                 }
             }
         }
