@@ -17,15 +17,15 @@
 #include <dirent.h>
 
 #define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
+#include "stb/stb_image.h"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "stb_image_write.h"
+#include "stb/stb_image_write.h"
 
 #define IMAGE_CHANNELS 3
 
 // #define OUTPUT_TILE_DIM 32
-#define OUTPUT_TILE_DIM 16
+#define OUTPUT_TILE_DIM 32
 // #define OUTPUT_TILE_DIM 10
 // #define OUTPUT_TILE_DIM 16
 // Declare Constant Memory
@@ -303,8 +303,8 @@ __global__ void output_tile_convolution(float *image, float *output_image, int w
         int step = blockDim.x * blockDim.y;
 
         int index_before_linearization = thread_id + i * step;
-        int lin_col = start_index_x + index_before_linearization % OUTPUT_TILE_DIM;
-        int lin_row = start_index_y + index_before_linearization / OUTPUT_TILE_DIM;
+        int lin_col = start_index_x + index_before_linearization % INPUT_TILE_DIM;
+        int lin_row = start_index_y + index_before_linearization / INPUT_TILE_DIM;
 
         if (lin_row >= 0 && lin_col >= 0 && lin_col < width && lin_row < height)
         {
@@ -350,7 +350,7 @@ __global__ void output_tile_convolution(float *image, float *output_image, int w
     // OutPut Image Indices
     int out_row = blockIdx.y * OUTPUT_TILE_DIM + threadIdx.y;
     int out_col = blockIdx.x * OUTPUT_TILE_DIM + threadIdx.x;
-    //printf("[%d,%d]\n",out_row,out_col);
+    // printf("[%d,%d]\n",out_row,out_col);
 
     if (out_row >= 0 && out_row < height && out_col >= 0 && out_col < width)
     {
@@ -376,10 +376,10 @@ __global__ void output_tile_convolution(float *image, float *output_image, int w
                         if (blockIdx.x == 1 && blockIdx.y == 0)
                         {
 
-                            //printf("sh[%d]\n", (sh_row * blockDim.x + sh_col) * IMAGE_CHANNELS + c);
+                            // printf("sh[%d]\n", (sh_row * blockDim.x + sh_col) * IMAGE_CHANNELS + c);
                         }
                         // Every Channel
-                        sum += filter_c[filterRow * filter_dim + filterCol] * sh_mem[(sh_row * blockDim.x + sh_col) * IMAGE_CHANNELS + c];
+                        sum += filter_c[filterRow * filter_dim + filterCol] * sh_mem[(sh_row * INPUT_TILE_DIM + sh_col) * IMAGE_CHANNELS + c];
                         // sum = sh_mem[(sh_row * blockDim.x + sh_col) * IMAGE_CHANNELS];
                     }
                 }
