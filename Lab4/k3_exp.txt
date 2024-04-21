@@ -1,0 +1,147 @@
+512 * 256
+
+./out_3 ./input ./output_k3 11 .\filters\avg_3_3.txt
+==27568== Warning: 7 API trace records have same start and end timestamps.
+This can happen because of short execution duration of CUDA APIs and low timer resolution on the underlying operating system.
+==27568== Profiling result:
+            Type  Time(%)      Time     Calls       Avg       Min       Max  Name
+ GPU activities:   49.06%  2.6269ms        12  218.91us     384ns  629.89us  [CUDA memcpy HtoD]
+                   46.82%  2.5071ms         1  2.5071ms  2.5071ms  2.5071ms  [CUDA memcpy DtoH]
+                    4.12%  220.87us         1  220.87us  220.87us  220.87us  output_tile_convolution(float*, float*, int, int, int, int, int)
+      API calls:   77.55%  128.53ms         1  128.53ms  128.53ms  128.53ms  cudaMemcpyToSymbol
+                   16.66%  27.616ms         1  27.616ms  27.616ms  27.616ms  cuDevicePrimaryCtxRelease
+                    4.37%  7.2346ms        12  602.88us  168.90us  3.1434ms  cudaMemcpy
+                    0.47%  778.60us         1  778.60us  778.60us  778.60us  cudaDeviceSynchronize
+                    0.40%  660.80us         3  220.27us  30.500us  388.80us  cudaFree
+                    0.32%  528.60us         2  264.30us  205.50us  323.10us  cudaMalloc
+                    0.16%  266.70us         1  266.70us  266.70us  266.70us  cuLibraryUnload
+                    0.06%  92.800us         1  92.800us  92.800us  92.800us  cudaLaunchKernel
+                    0.01%  17.100us       114     150ns       0ns  1.5000us  cuDeviceGetAttribute
+                    0.00%  2.5000us         3     833ns     200ns  2.1000us  cuDeviceGetCount
+                    0.00%  1.7000us         1  1.7000us  1.7000us  1.7000us  cuModuleGetLoadingMode
+                    0.00%  1.5000us         2     750ns     200ns  1.3000us  cuDeviceGet
+                    0.00%     700ns         1     700ns     700ns     700ns  cuDeviceGetName
+                    0.00%     500ns         1     500ns     500ns     500ns  cuDeviceTotalMem
+                    0.00%     400ns         1     400ns     400ns     400ns  cudaGetLastError
+                    0.00%     200ns         1     200ns     200ns     200ns  cuDeviceGetLuid
+                    0.00%     100ns         1     100ns     100ns     100ns  cuDeviceGetUuid
+
+
+                    
+./out_3 ./input ./output_k3 11 .\filters\avg_9_9.txt
+==26828== Warning: 7 API trace records have same start and end timestamps.
+This can happen because of short execution duration of CUDA APIs and low timer resolution on the underlying operating system.
+==26828== Profiling result:
+            Type  Time(%)      Time     Calls       Avg       Min       Max  Name
+ GPU activities:   41.27%  2.3060ms        12  192.17us     384ns  242.21us  [CUDA memcpy HtoD]
+                   30.80%  1.7210ms         1  1.7210ms  1.7210ms  1.7210ms  output_tile_convolution(float*, float*, int, int, int, int, int)
+                   27.94%  1.5613ms         1  1.5613ms  1.5613ms  1.5613ms  [CUDA memcpy DtoH]
+      API calls:   73.46%  113.90ms         1  113.90ms  113.90ms  113.90ms  cudaMemcpyToSymbol
+                   20.07%  31.118ms         1  31.118ms  31.118ms  31.118ms  cuDevicePrimaryCtxRelease
+                    3.98%  6.1723ms        12  514.36us  196.30us  1.9029ms  cudaMemcpy
+                    1.44%  2.2363ms         1  2.2363ms  2.2363ms  2.2363ms  cudaDeviceSynchronize
+                    0.47%  727.10us         3  242.37us  8.5000us  367.10us  cudaFree
+                    0.22%  337.30us         2  168.65us  117.90us  219.40us  cudaMalloc
+                    0.16%  245.80us         1  245.80us  245.80us  245.80us  cudaLaunchKernel
+                    0.15%  239.90us         1  239.90us  239.90us  239.90us  cuLibraryUnload
+                    0.04%  58.800us       114     515ns       0ns  23.200us  cuDeviceGetAttribute
+                    0.00%  3.0000us         3  1.0000us     100ns  2.5000us  cuDeviceGetCount
+                    0.00%  2.1000us         1  2.1000us  2.1000us  2.1000us  cuModuleGetLoadingMode
+                    0.00%  1.5000us         2     750ns     100ns  1.4000us  cuDeviceGet
+                    0.00%     700ns         1     700ns     700ns     700ns  cuDeviceGetName
+                    0.00%     400ns         1     400ns     400ns     400ns  cudaGetLastError
+                    0.00%     300ns         1     300ns     300ns     300ns  cuDeviceTotalMem
+                    0.00%     300ns         1     300ns     300ns     300ns  cuDeviceGetLuid
+                    0.00%     100ns         1     100ns     100ns     100ns  cuDeviceGetUuid
+
+
+
+
+2000 * 1500
+
+
+
+
+./out_3 ./input ./output_k3 11 .\filters\avg_9_9.txt
+==26780== Warning: 5 API trace records have same start and end timestamps.
+This can happen because of short execution duration of CUDA APIs and low timer resolution on the underlying operating system.
+==26780== Profiling result:
+            Type  Time(%)      Time     Calls       Avg       Min       Max  Name
+ GPU activities:   44.90%  47.202ms        12  3.9335ms     384ns  5.7302ms  [CUDA memcpy HtoD]
+                   30.55%  32.113ms         1  32.113ms  32.113ms  32.113ms  output_tile_convolution(float*, float*, int, int, int, int, int)
+                   24.55%  25.814ms         1  25.814ms  25.814ms  25.814ms  [CUDA memcpy DtoH]
+      API calls:   39.56%  92.916ms         1  92.916ms  92.916ms  92.916ms  cudaMemcpyToSymbol
+                   32.15%  75.513ms        12  6.2927ms  3.9577ms  26.156ms  cudaMemcpy
+                   15.44%  36.272ms         1  36.272ms  36.272ms  36.272ms  cudaDeviceSynchronize
+                   10.97%  25.765ms         1  25.765ms  25.765ms  25.765ms  cuDevicePrimaryCtxRelease
+                    1.28%  3.0166ms         3  1.0055ms  7.8000us  2.3512ms  cudaFree
+                    0.48%  1.1288ms         2  564.40us  345.40us  783.40us  cudaMalloc
+                    0.07%  168.60us         1  168.60us  168.60us  168.60us  cuLibraryUnload
+                    0.03%  79.000us         1  79.000us  79.000us  79.000us  cudaLaunchKernel
+                    0.01%  17.000us       114     149ns       0ns  1.5000us  cuDeviceGetAttribute
+                    0.00%  2.8000us         3     933ns     100ns  2.5000us  cuDeviceGetCount
+                    0.00%  1.7000us         1  1.7000us  1.7000us  1.7000us  cuModuleGetLoadingMode
+                    0.00%  1.4000us         2     700ns     100ns  1.3000us  cuDeviceGet
+                    0.00%     800ns         1     800ns     800ns     800ns  cuDeviceGetName
+                    0.00%     400ns         1     400ns     400ns     400ns  cudaGetLastError
+                    0.00%     300ns         1     300ns     300ns     300ns  cuDeviceTotalMem
+                    0.00%     200ns         1     200ns     200ns     200ns  cuDeviceGetUuid
+                    0.00%     200ns         1     200ns     200ns     200ns  cuDeviceGetLuid
+
+
+
+
+./out_3 ./input ./output_k3 11 .\filters\avg_3_3.txt
+==10432== Warning: 9 API trace records have same start and end timestamps.
+This can happen because of short execution duration of CUDA APIs and low timer resolution on the underlying operating system.
+==10432== Profiling result:
+            Type  Time(%)      Time     Calls       Avg       Min       Max  Name
+ GPU activities:   56.15%  45.873ms        12  3.8228ms     352ns  5.5468ms  [CUDA memcpy HtoD]
+                   37.94%  30.995ms         1  30.995ms  30.995ms  30.995ms  [CUDA memcpy DtoH]
+                    5.91%  4.8305ms         1  4.8305ms  4.8305ms  4.8305ms  output_tile_convolution(float*, float*, int, int, int, int, int)
+      API calls:   46.71%  112.80ms         1  112.80ms  112.80ms  112.80ms  cudaMemcpyToSymbol
+                   32.65%  78.839ms        12  6.5699ms  3.7370ms  31.302ms  cudaMemcpy
+                   14.21%  34.326ms         1  34.326ms  34.326ms  34.326ms  cuDevicePrimaryCtxRelease
+                    3.62%  8.7326ms         1  8.7326ms  8.7326ms  8.7326ms  cudaDeviceSynchronize
+                    1.63%  3.9255ms         3  1.3085ms  27.900us  3.1911ms  cudaFree
+                    0.54%  1.3067ms         1  1.3067ms  1.3067ms  1.3067ms  cudaLaunchKernel
+                    0.52%  1.2463ms         2  623.15us  456.00us  790.30us  cudaMalloc
+                    0.12%  288.90us         1  288.90us  288.90us  288.90us  cuLibraryUnload
+                    0.01%  16.900us       114     148ns       0ns  1.7000us  cuDeviceGetAttribute
+                    0.00%  3.9000us         3  1.3000us     200ns  3.4000us  cuDeviceGetCount
+                    0.00%  2.2000us         1  2.2000us  2.2000us  2.2000us  cuModuleGetLoadingMode
+                    0.00%  1.4000us         2     700ns     100ns  1.3000us  cuDeviceGet
+                    0.00%     700ns         1     700ns     700ns     700ns  cuDeviceGetName
+                    0.00%     500ns         1     500ns     500ns     500ns  cudaGetLastError
+                    0.00%     300ns         1     300ns     300ns     300ns  cuDeviceTotalMem
+                    0.00%     300ns         1     300ns     300ns     300ns  cuDeviceGetLuid
+                    0.00%     200ns         1     200ns     200ns     200ns  cuDeviceGetUuid
+
+
+
+./out_3 ./input ./output_k3 11 .\filters\avg_9_9.txt
+==26780== Warning: 5 API trace records have same start and end timestamps.
+This can happen because of short execution duration of CUDA APIs and low timer resolution on the underlying operating system.
+==26780== Profiling result:
+            Type  Time(%)      Time     Calls       Avg       Min       Max  Name
+ GPU activities:   44.90%  47.202ms        12  3.9335ms     384ns  5.7302ms  [CUDA memcpy HtoD]
+                   30.55%  32.113ms         1  32.113ms  32.113ms  32.113ms  output_tile_convolution(float*, float*, int, int, int, int, int)
+                   24.55%  25.814ms         1  25.814ms  25.814ms  25.814ms  [CUDA memcpy DtoH]
+      API calls:   39.56%  92.916ms         1  92.916ms  92.916ms  92.916ms  cudaMemcpyToSymbol
+                   32.15%  75.513ms        12  6.2927ms  3.9577ms  26.156ms  cudaMemcpy
+                   15.44%  36.272ms         1  36.272ms  36.272ms  36.272ms  cudaDeviceSynchronize
+                   10.97%  25.765ms         1  25.765ms  25.765ms  25.765ms  cuDevicePrimaryCtxRelease
+                    1.28%  3.0166ms         3  1.0055ms  7.8000us  2.3512ms  cudaFree
+                    0.48%  1.1288ms         2  564.40us  345.40us  783.40us  cudaMalloc
+                    0.07%  168.60us         1  168.60us  168.60us  168.60us  cuLibraryUnload
+                    0.03%  79.000us         1  79.000us  79.000us  79.000us  cudaLaunchKernel
+                    0.01%  17.000us       114     149ns       0ns  1.5000us  cuDeviceGetAttribute
+                    0.00%  2.8000us         3     933ns     100ns  2.5000us  cuDeviceGetCount
+                    0.00%  1.7000us         1  1.7000us  1.7000us  1.7000us  cuModuleGetLoadingMode
+                    0.00%  1.4000us         2     700ns     100ns  1.3000us  cuDeviceGet
+                    0.00%     800ns         1     800ns     800ns     800ns  cuDeviceGetName
+                    0.00%     400ns         1     400ns     400ns     400ns  cudaGetLastError
+                    0.00%     300ns         1     300ns     300ns     300ns  cuDeviceTotalMem
+                    0.00%     200ns         1     200ns     200ns     200ns  cuDeviceGetUuid
+                    0.00%     200ns         1     200ns     200ns     200ns  cuDeviceGetLuid
+            

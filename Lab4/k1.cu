@@ -15,16 +15,16 @@
 #include <dirent.h>
 
 #define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
+#include "stb/stb_image.h"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "stb_image_write.h"
+#include "stb/stb_image_write.h"
 
 #define IMAGE_CHANNELS 3
 
 // Declare Constant Memory
 // Max is 400 floating element :D
-__constant__ float filter_c[20 * 20];
+// __constant__ float filter_c[20 * 20];
 
 // Host Functions
 __host__ float *read_filter(const char *file_path, int &filter_dim)
@@ -174,7 +174,7 @@ __host__ void write_image(const char *folder_name, char *file_name, float *data,
 }
 
 // Device Kernels
-__global__ void BatchConvolution(float *image, float *output_image, int width, int height, int batch_size, int filter_dim)
+__global__ void BatchConvolution(float *image, float *output_image, int width, int height, int batch_size, int filter_dim, float *filter_c)
 {
     // Each Thread is responsible for one pixel in the output image
     int outRow = blockDim.y * blockIdx.y + threadIdx.y;
@@ -225,9 +225,13 @@ int main(int argc, char *argv[])
     // 1. Reading Filter
     int filter_dim;
     float *filter = read_filter(filter_pth, filter_dim);
+    // 1.1. Copy Filter to cuda memory
+    float *filter_c;
+    cudaMalloc((void **)&filter_c, sizeof(float) * filter_dim * filter_dim);
+    cudaMemcpy(filter_c, filter, sizeof(float) * filter_dim * filter_dim, cudaMemcpyHostToDevice);
 
     // 2. Copy Filter to Constant Memory
-    cudaMemcpyToSymbol(filter_c, filter, filter_dim * filter_dim * sizeof(float));
+    // cudaMemcpyToSymbol(filter_c, filter, filter_dim * filter_dim * sizeof(float));
 
     // 3. Process Images
     printf("Reading Images from Directory: %s\n", input_dir);
@@ -319,7 +323,7 @@ int main(int argc, char *argv[])
             // Convolution
             // Block Size
             dim3 threadsPerBlock(16, 16, 1);
-            
+
             // Grid Size
             dim3 numBlocks((IMAGE_WIDTH + threadsPerBlock.x - 1) / threadsPerBlock.x,
                            (IMAGE_HEIGHT + threadsPerBlock.y - 1) / threadsPerBlock.y,
@@ -328,7 +332,7 @@ int main(int argc, char *argv[])
             printf("batch counter %i\n", (batch_counter + threadsPerBlock.z - 1) / threadsPerBlock.z);
 
             // Call the kernel
-            BatchConvolution<<<numBlocks, threadsPerBlock>>>(d_batched_images, d_output, IMAGE_WIDTH, IMAGE_HEIGHT, batch_counter, filter_dim);
+            BatchConvolution<<<numBlocks, threadsPerBlock>>>(d_batched_images, d_output, IMAGE_WIDTH, IMAGE_HEIGHT, batch_counter, filter_dim, filter_c);
 
             // If Error occurs in Kernel Execution Show it using cudaDeviceSynchronize,cudaGetLastError:D
             cudaDeviceSynchronize();

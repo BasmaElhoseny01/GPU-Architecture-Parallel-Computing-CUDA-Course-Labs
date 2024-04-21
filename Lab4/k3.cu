@@ -17,16 +17,16 @@
 #include <dirent.h>
 
 #define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
+#include "stb/stb_image.h"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "stb_image_write.h"
+#include "stb/stb_image_write.h"
 
 #define IMAGE_CHANNELS 3
 
 // #define OUTPUT_TILE_DIM 32
 #define OUTPUT_TILE_DIM 16
-__constant__ float filter_c[20 * 20];
+// __constant__ float filter_c[20 * 20];
 
 // Host Functions
 __host__ float *read_filter(const char *file_path, int &filter_dim)
@@ -175,7 +175,7 @@ __host__ void write_image(const char *folder_name, char *file_name, float *data,
     delete[] unsigned_char_data;
 }
 
-__global__ void output_tile_convolution(float *image, float *output_image, int width, int height, int batch_size, int filter_dim, const int INPUT_TILE_DIM)
+__global__ void output_tile_convolution(float *image, float *output_image, int width, int height, int batch_size, int filter_dim, const int INPUT_TILE_DIM, float *filter_c)
 {
     // Store all elements needed to compute output in shared memory for the 3 channels
     extern __shared__ float sh_mem[];
@@ -289,8 +289,10 @@ int main(int argc, char *argv[])
     int filter_dim;
     float *filter = read_filter(filter_pth, filter_dim);
 
-    // 2. Copy Filter to Constant Memory
-    cudaMemcpyToSymbol(filter_c, filter, filter_dim * filter_dim * sizeof(float));
+    // 1.1. Copy Filter to cuda memory
+    float *filter_c;
+    cudaMalloc((void **)&filter_c, sizeof(float) * filter_dim * filter_dim);
+    cudaMemcpy(filter_c, filter, sizeof(float) * filter_dim * filter_dim, cudaMemcpyHostToDevice);
 
     // 3. Process Images
     printf("Reading Images from Directory: %s\n", input_dir);
@@ -407,7 +409,7 @@ int main(int argc, char *argv[])
             // printf("%d\n", input_tile_dim);
             // return 0;
 
-            output_tile_convolution<<<blocks_num, threads_per_block, input_tile_dim * input_tile_dim * 3 * sizeof(float)>>>(d_batched_images, d_output, IMAGE_WIDTH, IMAGE_HEIGHT, batch_counter, filter_dim, input_tile_dim);
+            output_tile_convolution<<<blocks_num, threads_per_block, input_tile_dim * input_tile_dim * 3 * sizeof(float)>>>(d_batched_images, d_output, IMAGE_WIDTH, IMAGE_HEIGHT, batch_counter, filter_dim, input_tile_dim, filter_c);
 
             // If Error occurs in Kernel Execution Show it using cudaDeviceSynchronize,cudaGetLastError:D
             cudaDeviceSynchronize();
