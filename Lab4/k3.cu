@@ -17,19 +17,15 @@
 #include <dirent.h>
 
 #define STB_IMAGE_IMPLEMENTATION
-#include "stb/stb_image.h"
+#include "stb_image.h"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "stb/stb_image_write.h"
+#include "stb_image_write.h"
 
 #define IMAGE_CHANNELS 3
 
 // #define OUTPUT_TILE_DIM 32
 #define OUTPUT_TILE_DIM 16
-//  #define OUTPUT_TILE_DIM 10
-//  #define OUTPUT_TILE_DIM 16
-//  Declare Constant Memory
-//  Max is 400 floating element :D
 __constant__ float filter_c[20 * 20];
 
 // Host Functions
@@ -407,8 +403,8 @@ int main(int argc, char *argv[])
 
             // printf("%d\n", blocks_num.x);
             // printf("%d\n", blocks_num.y);
-            printf("%d\n", input_tile_dim * input_tile_dim * 3);
-            printf("%d\n", input_tile_dim);
+            // printf("%d\n", input_tile_dim * input_tile_dim * 3);
+            // printf("%d\n", input_tile_dim);
             // return 0;
 
             output_tile_convolution<<<blocks_num, threads_per_block, input_tile_dim * input_tile_dim * 3 * sizeof(float)>>>(d_batched_images, d_output, IMAGE_WIDTH, IMAGE_HEIGHT, batch_counter, filter_dim, input_tile_dim);
@@ -449,17 +445,17 @@ int main(int argc, char *argv[])
             }
         }
 
-        // // Free Host Memory
-        // // Free memory allocated for the filter in host memory
-        // free(filter);
-        // // Free memory allocated for the filter in host memory
-        // free(image_filenames);
+        // Free Host Memory
+        // Free memory allocated for the filter in host memory
+        free(filter);
+        // Free memory allocated for the filter in host memory
+        free(image_filenames);
 
-        // // Free Device Memory
-        // // Free memory allocated for the filter in constant memory
-        // cudaFree(filter_c);
-        // // Free memory allocated for the batched images in device shared memory
-        // cudaFree(d_batched_images);
+        // Free Device Memory
+        // Free memory allocated for the filter in constant memory
+        cudaFree(filter_c);
+        // Free memory allocated for the batched images in device shared memory
+        cudaFree(d_batched_images);
 
         // Close the diresctory
         closedir(dir);

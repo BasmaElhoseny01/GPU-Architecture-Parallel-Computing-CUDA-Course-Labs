@@ -17,10 +17,10 @@
 #include <dirent.h>
 
 #define STB_IMAGE_IMPLEMENTATION
-#include "stb/stb_image.h"
+#include "stb_image.h"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "stb/stb_image_write.h"
+#include "stb_image_write.h"
 
 #define IMAGE_CHANNELS 3
 
@@ -402,17 +402,17 @@ int main(int argc, char *argv[])
             }
         }
 
-        // // Free Host Memory
-        // // Free memory allocated for the filter in host memory
-        // free(filter);
-        // // Free memory allocated for the filter in host memory
-        // free(image_filenames);
+        // Free Host Memory
+        // Free memory allocated for the filter in host memory
+        free(filter);
+        // Free memory allocated for the filter in host memory
+        free(image_filenames);
 
-        // // Free Device Memory
-        // // Free memory allocated for the filter in constant memory
-        // cudaFree(filter_c);
-        // // Free memory allocated for the batched images in device shared memory
-        // cudaFree(d_batched_images);
+        // Free Device Memory
+        // Free memory allocated for the filter in constant memory
+        cudaFree(filter_c);
+        // Free memory allocated for the batched images in device shared memory
+        cudaFree(d_batched_images);
 
         // Close the diresctory
         closedir(dir);
