@@ -45,7 +45,7 @@ int main(int argc, char *argv[])
 {
 
     char *input_file = argv[1];
-    float target_value = atof(argv[2]);
+    // float target_value = atof(argv[2]);
 
     int N = 0;
 
