@@ -116,7 +116,7 @@ __host__ void get_dimensions(const char *input_dir, int *width, int *height, int
 }
 
 // __host__ void read_images_batch
-__host__ void read_image(const char *folder_name, char *file_name, float **data, int *width, int *height, int *channels)
+__host__ void load_input_image(const char *folder_name, char *file_name, float **data, int *width, int *height, int *channels)
 {
     // Concatenate directory path and filename
     char file_path[256];
@@ -147,7 +147,7 @@ __host__ void read_image(const char *folder_name, char *file_name, float **data,
     printf("Image size: %d x %d x %d\n", *width, *height, *channels);
 }
 
-__host__ void write_image(const char *folder_name, char *file_name, float *data, int width, int height, int channels)
+__host__ void dump_output_image(const char *folder_name, char *file_name, float *data, int width, int height, int channels)
 {
     // Create the output file path
     std::string folder(folder_name);
@@ -347,7 +347,7 @@ int main(int argc, char *argv[])
                     float *image_data;
                     int width, height, channels;
                     // Host memory allocation & Read Image and
-                    read_image(input_dir, ent->d_name, &image_data, &width, &height, &channels);
+                    load_input_image(input_dir, ent->d_name, &image_data, &width, &height, &channels);
 
                     // Check on input image dimensions
                     assert(width == IMAGE_WIDTH && height == IMAGE_HEIGHT);
@@ -433,7 +433,7 @@ int main(int argc, char *argv[])
             {
                 // 3.8 Save Image
                 // Concatenate directory path and filename
-                write_image(output_dir, image_filenames[i], output + (i * IMAGE_HEIGHT * IMAGE_WIDTH), IMAGE_WIDTH, IMAGE_HEIGHT, 1);
+                dump_output_image(output_dir, image_filenames[i], output + (i * IMAGE_HEIGHT * IMAGE_WIDTH), IMAGE_WIDTH, IMAGE_HEIGHT, 1);
             }
 
             // Free Host Memory

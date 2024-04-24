@@ -113,63 +113,57 @@ __host__ void get_dimensions(const char *input_dir, int *width, int *height, int
     }
 }
 
-// __host__ void read_images_batch
-__host__ void read_image(const char *folder_name, char *file_name, float **data, int *width, int *height, int *channels)
+__host__ void load_input_image(const char *folder_name, char *file_name, float **image, int *width, int *height, int *channels)
 {
     // Concatenate directory path and filename
-    char file_path[256];
-    snprintf(file_path, sizeof(file_path), "%s/%s", folder_name, file_name);
-
-    printf("Reading Image: %s\n", file_path);
+    char path[256];
+    snprintf(path, sizeof(path), "%s/%s", folder_name, file_name);
 
     // Read Image
-    unsigned char *udata = stbi_load(file_path, width, height, channels, 0);
+    unsigned char *image_data = stbi_load(path, width, height, channels, 0);
 
     // Host Memory Allocation & convert data from unsigned char to float
-    *data = (float *)malloc((*width) * (*height) * (*channels) * sizeof(float));
+    *image = (float *)malloc(sizeof(float) * (*width) * (*height) * (*channels));
 
-    // Normlaize the data --> 0 to 1
-    for (int i = 0; i < (*width) * (*height) * (*channels); i++)
+    // Normlaization
+    for (int i = 0; i < (*height) * (*width) * (*channels); i++)
     {
-        (*data)[i] = (float)udata[i] / 255.0f;
+        (*image)[i] = (float)image_data[i] / 255.0f;
     }
 
-    if (*data == NULL)
+    if (*image == NULL)
     {
-        printf("Error loading image at %s", file_path);
+        printf("Error loading image\n");
         exit(1);
     }
-    // Free the loaded image
-    stbi_image_free(udata);
 
-    printf("Image size: %d x %d x %d\n", *width, *height, *channels);
+    // Free the loaded image
+    stbi_image_free(image_data);
 }
 
-__host__ void write_image(const char *folder_name, char *file_name, float *data, int width, int height, int channels)
+__host__ void dump_output_image(const char *out_directory, char *file_name, float *output_img, int width, int height, int channels)
 {
-    // Create the output file path
-    std::string folder(folder_name);
-    std::string path = folder + "/" + (std::string)file_name;
 
-    printf("Writing image to %s\n", path.c_str());
+    std::string directory(out_directory);
+    std::string path = directory + "/" + (std::string)file_name;
 
-    // Allocate memory for unsigned char data
+    // Memory allocation
     unsigned char *unsigned_char_data = new unsigned char[width * height * channels];
 
-    // Convert from float to unsigned char
-    for (int j = 0; j < width * height * channels; ++j)
+    for (int j = 0; j < height * width * channels; ++j)
     {
         // Clipping
-        unsigned_char_data[j] = static_cast<unsigned char>(255.0f * std::max(0.0f, std::min(1.0f, data[j]))); // Clamp values to [0, 1] range
+        unsigned_char_data[j] = static_cast<unsigned char>(255.0f * std::max(0.0f, std::min(1.0f, output_img[j]))); // Clamp values to [0, 1] range
     }
 
-    // Write the image to disk
-    if (!stbi_write_png(path.c_str(), width, height, channels, unsigned_char_data, width * channels))
+    bool result = stbi_write_png(path.c_str(), width, height, channels, unsigned_char_data, width * channels);
+
+    if (!result)
     {
-        printf("Failed to write image to %s\n", path.c_str());
+        printf("Failed to write image\n");
     }
 
-    // Free the allocated memory
+    // Free memory
     delete[] unsigned_char_data;
 }
 
@@ -288,7 +282,7 @@ int main(int argc, char *argv[])
                     float *image_data;
                     int width, height, channels;
                     // Host memory allocation & Read Image and
-                    read_image(input_dir, ent->d_name, &image_data, &width, &height, &channels);
+                    load_input_image(input_dir, ent->d_name, &image_data, &width, &height, &channels);
 
                     // Check on input image dimensions
                     assert(width == IMAGE_WIDTH && height == IMAGE_HEIGHT);
@@ -358,7 +352,7 @@ int main(int argc, char *argv[])
             {
                 // 3.8 Save Image
                 // Concatenate directory path and filename
-                write_image(output_dir, image_filenames[i], output + (i * IMAGE_HEIGHT * IMAGE_WIDTH), IMAGE_WIDTH, IMAGE_HEIGHT, 1);
+                dump_output_image(output_dir, image_filenames[i], output + (i * IMAGE_HEIGHT * IMAGE_WIDTH), IMAGE_WIDTH, IMAGE_HEIGHT, 1);
             }
 
             // Free Host Memory
