@@ -32,5 +32,5 @@
   </tr>
 </table>
 
-## <img  align= center width=80px src="https://moein.video/wp-content/uploads/2022/05/license-GIF-Certificate-Royalty-Free-Animated-Icon-350px-after-effects-project.gif">  License
+## <img  align= center height=80px src="https://moein.video/wp-content/uploads/2022/05/license-GIF-Certificate-Royalty-Free-Animated-Icon-350px-after-effects-project.gif">  License
 This software is licensed under the [MIT License](https://github.com/BasmaElhoseny01/Parallel-Computing-Labs/blob/main/LICENSE). © Basma Elhoseny.
